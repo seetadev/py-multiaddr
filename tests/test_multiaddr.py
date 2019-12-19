@@ -355,3 +355,9 @@ def test_zone():
 
     maddr_from_bytes = Multiaddr(ip6_bytes)
     assert str(maddr_from_bytes) == ip6_string
+
+
+def test_hash():
+    addr_bytes = Multiaddr("/ip4/127.0.0.1/udp/1234").to_bytes()
+
+    assert hash(Multiaddr(addr_bytes)) == hash(addr_bytes)
