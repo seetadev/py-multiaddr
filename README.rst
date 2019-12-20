@@ -15,7 +15,7 @@ py-multiaddr
         :alt: Documentation Status
 ..
 
-    multiaddr_ implementation in Python 🐍
+    multiaddr_ implementation in Python
 
 .. _multiaddr: https://github.com/multiformats/multiaddr
 
