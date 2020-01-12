@@ -37,11 +37,13 @@ ADDR_BYTES_MAP_STR_TEST_DATA = [
 
     # Additional test data
     (_names_to_protocols['dns4'],
-     b'xn--4gbrim.xn----ymcbaaajlc6dj7bxne2c.xn--wgbh1c',
+     b'\xd9\x85\xd9\x88\xd9\x82\xd8\xb9.\xd9\x88\xd8\xb2\xd8\xa7\xd8\xb1\xd8\xa9'
+     b'-\xd8\xa7\xd9\x84\xd8\xa7\xd8\xaa\xd8\xb5\xd8\xa7\xd9\x84\xd8\xa7\xd8\xaa'
+     b'.\xd9\x85\xd8\xb5\xd8\xb1',
      # Explicitly mark this as unicode to force the text to be LTR in editors
      u'موقع.وزارة-الاتصالات.مصر'),
     (_names_to_protocols['dns4'],
-     b'xn--fuball-cta.example',
+     b'fu\xc3\x9fball.example',
      u'fußball.example'),  # This will fail if IDNA-2003/NamePrep is used
 ]
 

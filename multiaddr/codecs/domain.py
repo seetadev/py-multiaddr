@@ -10,8 +10,11 @@ IS_PATH = False
 
 
 def to_bytes(proto, string):
-    return idna.encode(string, uts46=True)
+    return idna.uts46_remap(string).encode("utf-8")
 
 
 def to_string(proto, buf):
-    return idna.decode(buf)
+    string = buf.decode("utf-8")
+    for label in string.split("."):
+        idna.check_label(label)
+    return string
