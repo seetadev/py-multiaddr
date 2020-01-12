@@ -152,6 +152,8 @@ class Multiaddr(collections.abc.Mapping):
         """Returns the byte array representation of this Multiaddr."""
         return self._bytes
 
+    __bytes__ = to_bytes
+
     def protocols(self):
         """Returns a list of Protocols this Multiaddr includes."""
         return MultiAddrKeys(self)
