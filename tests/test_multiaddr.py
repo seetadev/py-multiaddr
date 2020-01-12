@@ -1,9 +1,4 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
 import pytest
-import six
 
 from multiaddr.exceptions import BinaryParseError
 from multiaddr.exceptions import ProtocolLookupError
@@ -111,7 +106,7 @@ def test_invalid(addr_str):
      "/dns4/موقع.وزارة-الاتصالات.مصر"])  # nopep8
 def test_valid(addr_str):
     ma = Multiaddr(addr_str)
-    assert six.text_type(ma) == addr_str.rstrip("/")
+    assert str(ma) == addr_str.rstrip("/")
 
 
 def test_eq():

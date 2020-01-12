@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 import io
 
 import pytest
@@ -44,7 +43,7 @@ ADDR_BYTES_MAP_STR_TEST_DATA = [
      u'موقع.وزارة-الاتصالات.مصر'),
     (_names_to_protocols['dns4'],
      b'fu\xc3\x9fball.example',
-     u'fußball.example'),  # This will fail if IDNA-2003/NamePrep is used
+     'fußball.example'),  # This will fail if IDNA-2003/NamePrep is used
 ]
 
 BYTES_MAP_STR_TEST_DATA = [
@@ -107,7 +106,7 @@ class DummyProtocol(Protocol):
 
 class UnparsableProtocol(DummyProtocol):
     def __init__(self):
-        super(UnparsableProtocol, self).__init__(333, "unparsable", "?")
+        super().__init__(333, "unparsable", "?")
 
 
 @pytest.fixture

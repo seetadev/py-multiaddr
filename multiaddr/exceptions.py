@@ -15,7 +15,7 @@ class ProtocolLookupError(LookupError):
         self.proto = proto
         self.string = string
 
-        super(ProtocolLookupError, self).__init__(
+        super().__init__(
             "MultiAddr {0!r} does not contain protocol {1}".format(string, proto)
         )
 
@@ -40,7 +40,7 @@ class StringParseError(ParseError):
         else:
             message = "Invalid MultiAddr {0!r}: {1}".format(string, message)
 
-        super(StringParseError, self).__init__(message)
+        super().__init__(message)
 
 
 class BinaryParseError(ParseError):
@@ -56,7 +56,7 @@ class BinaryParseError(ParseError):
 
         message = "Invalid binary MultiAddr protocol {0}: {1}".format(protocol, message)
 
-        super(BinaryParseError, self).__init__(message)
+        super().__init__(message)
 
 
 class ProtocolManagerError(Error):
@@ -71,7 +71,7 @@ class ProtocolExistsError(ProtocolManagerError):
         self.proto = proto
         self.kind = kind
 
-        super(ProtocolExistsError, self).__init__(
+        super().__init__(
             "Protocol with {0} {1!r} already exists".format(kind, getattr(proto, kind))
         )
 
@@ -84,6 +84,6 @@ class ProtocolNotFoundError(ProtocolManagerError):
         self.value = value
         self.kind = kind
 
-        super(ProtocolNotFoundError, self).__init__(
+        super().__init__(
             "No protocol with {0} {1!r} found".format(kind, value)
         )

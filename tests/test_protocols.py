@@ -1,4 +1,3 @@
-import six
 import pytest
 import varint
 
@@ -46,7 +45,6 @@ def test_invalid_name(valid_params, invalid_name):
         protocols.Protocol(**valid_params)
 
 
-@pytest.mark.skipif(six.PY2, reason="Binary strings are allowed on Python 2")
 @pytest.mark.parametrize("invalid_codec", [b"ip4", 123, 0.123])
 def test_invalid_codec(valid_params, invalid_codec):
     valid_params['codec'] = invalid_codec
@@ -54,13 +52,13 @@ def test_invalid_codec(valid_params, invalid_codec):
         protocols.Protocol(**valid_params)
 
 
-@pytest.mark.parametrize("name", ["foo-str", u"foo-u"])
+@pytest.mark.parametrize("name", ["foo-str", "foo-u"])
 def test_valid_names(valid_params, name):
     valid_params['name'] = name
     test_valid(valid_params)
 
 
-@pytest.mark.parametrize("codec", ["ip4", u"ip6"])
+@pytest.mark.parametrize("codec", ["ip4", "ip6"])
 def test_valid_codecs(valid_params, codec):
     valid_params['codec'] = codec
     test_valid(valid_params)

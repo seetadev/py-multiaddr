@@ -1,11 +1,5 @@
-# -*- coding: utf-8 -*-
-try:
-    import collections.abc
-except ImportError:  # pragma: no cover (PY2)
-    import collections
-    collections.abc = collections
+import collections.abc
 
-import six
 import varint
 
 from . import exceptions, protocols
@@ -59,15 +53,12 @@ class MultiAddrItems(collections.abc.ItemsView, collections.abc.Sequence):
                     # If we have an address, return it
                     yield proto, codec.to_string(proto, part)
                 except Exception as exc:
-                    six.raise_from(
-                        exceptions.BinaryParseError(
+                    raise exceptions.BinaryParseError(
                             str(exc),
                             self._mapping.to_bytes(),
                             proto.name,
                             exc,
-                        ),
-                        exc,
-                    )
+                        ) from exc
             else:
                 # We were given something like '/utp', which doesn't have
                 # an address, so return None
@@ -116,15 +107,9 @@ class Multiaddr(collections.abc.Mapping):
             addr : A string-encoded or a byte-encoded Multiaddr
 
         """
-        # On Python 2 text string will often be binary anyways so detect the
-        # obvious case of a “binary-encoded” multiaddr starting with a slash
-        # and decode it into text
-        if six.PY2 and isinstance(addr, str) and addr.startswith("/"):  # pragma: no cover (PY2)
-            addr = addr.decode("utf-8")
-
-        if isinstance(addr, six.text_type):
+        if isinstance(addr, str):
             self._bytes = string_to_bytes(addr)
-        elif isinstance(addr, six.binary_type):
+        elif isinstance(addr, bytes):
             self._bytes = addr
         elif isinstance(addr, Multiaddr):
             self._bytes = addr.to_bytes()
@@ -155,17 +140,7 @@ class Multiaddr(collections.abc.Mapping):
         return iter(MultiAddrKeys(self))
 
     def __len__(self):
-        return sum((1 for _ in bytes_iter(self.to_bytes())))
-
-    # On Python 2 __str__ needs to return binary text, so expose the original
-    # function as __unicode__ and transparently encode its returned text based
-    # on the current locale
-    if six.PY2:  # pragma: no cover (PY2)
-        __unicode__ = __str__
-
-        def __str__(self):
-            import locale
-            return self.__unicode__().encode(locale.getpreferredencoding())
+        return sum(1 for _ in bytes_iter(self.to_bytes()))
 
     def __repr__(self):
         return "<Multiaddr %s>" % str(self)

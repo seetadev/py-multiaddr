@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import idna
 
 from . import LENGTH_PREFIXED_VAR_SIZE

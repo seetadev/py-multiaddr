@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-import six
 import varint
 
 from . import exceptions
@@ -68,7 +66,7 @@ _CODES = [
 ]
 
 
-class Protocol(object):
+class Protocol:
     __slots__ = [
         "code",   # int
         "name",   # string
@@ -76,11 +74,11 @@ class Protocol(object):
     ]
 
     def __init__(self, code, name, codec):
-        if not isinstance(code, six.integer_types):
+        if not isinstance(code, int):
             raise TypeError("code must be an integer")
-        if not isinstance(name, six.string_types):
+        if not isinstance(name, str):
             raise TypeError("name must be a string")
-        if not isinstance(codec, six.string_types) and codec is not None:
+        if not isinstance(codec, str) and codec is not None:
             raise TypeError("codec must be a string or None")
 
         self.code = code
@@ -149,8 +147,8 @@ PROTOCOLS = [
     Protocol(P_UNIX, 'unix', 'fspath'),
 ]
 
-_names_to_protocols = dict((proto.name, proto) for proto in PROTOCOLS)
-_codes_to_protocols = dict((proto.code, proto) for proto in PROTOCOLS)
+_names_to_protocols = {proto.name: proto for proto in PROTOCOLS}
+_codes_to_protocols = {proto.code: proto for proto in PROTOCOLS}
 
 
 def add_protocol(proto):
@@ -167,7 +165,6 @@ def add_protocol(proto):
 
 
 def protocol_with_name(name):
-    name = str(name)  # PY2: Convert Unicode strings to native/binary representation
     if name not in _names_to_protocols:
         raise exceptions.ProtocolNotFoundError(name, "name")
     return _names_to_protocols[name]
@@ -184,7 +181,7 @@ def protocol_with_any(proto):
         return proto
     elif isinstance(proto, int):
         return protocol_with_code(proto)
-    elif isinstance(proto, six.string_types):
+    elif isinstance(proto, str):
         return protocol_with_name(proto)
     else:
         raise TypeError("Protocol object, name or code expected, got {0!r}".format(proto))
