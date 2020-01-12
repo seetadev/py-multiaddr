@@ -2,3 +2,5 @@ varint
 base58
 netaddr
 idna
+py-cid
+py-multicodec >= 0.2.0

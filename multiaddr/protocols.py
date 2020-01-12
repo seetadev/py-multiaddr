@@ -132,7 +132,7 @@ PROTOCOLS = [
     Protocol(P_SCTP, 'sctp', 'uint16be'),
     Protocol(P_UDT, 'udt', None),
     Protocol(P_UTP, 'utp', None),
-    Protocol(P_P2P, 'p2p', 'p2p'),
+    Protocol(P_P2P, 'p2p', 'cid'),
     Protocol(P_ONION, 'onion', 'onion'),
     Protocol(P_ONION3, 'onion3', 'onion3'),
     Protocol(P_QUIC, 'quic', None),

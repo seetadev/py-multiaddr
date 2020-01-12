@@ -100,7 +100,8 @@ def test_invalid(addr_str):
      "/unix/Überrschung!/大柱",
      "/unix/stdio",
      "/ip4/1.2.3.4/tcp/80/unix/a/b/c/d/e/f",
-     "/ip4/127.0.0.1/p2p/QmcgpsyWgH8Y8ajJz1Cu72KnS5uo2Aa2LpzU7kinSupNKC/tcp/1234/unix/stdio",
+     "/ip4/127.0.0.1/p2p/QmcgpsyWgH8Y8ajJz1Cu72KnS5uo2Aa2LpzU7kinSupNKC"
+     "/tcp/1234/unix/stdio",
      "/ip4/127.0.0.1/tcp/9090/http/p2p-webrtc-direct",
      "/dns/example.com",
      "/dns4/موقع.وزارة-الاتصالات.مصر"])  # nopep8
@@ -174,8 +175,9 @@ def test_invalid_protocols_with_string(proto_string):
      ("/ip4/0.0.0.0", 0, ("/ip4/0.0.0.0",)),
      ("/ip6/::1", 1, ("/ip6/::1",)),
      ("/onion/timaq4ygg2iegci7:80/http", 0, ("/onion/timaq4ygg2iegci7:80/http",)),
-     ("/ip4/127.0.0.1/p2p/QmcgpsyWgH8Y8ajJz1Cu72KnS5uo2Aa2LpzU7kinSupNKC/tcp/1234", 1,
-      ("/ip4/127.0.0.1", "/p2p/QmcgpsyWgH8Y8ajJz1Cu72KnS5uo2Aa2LpzU7kinSupNKC/tcp/1234",)),
+     ("/ip4/127.0.0.1/p2p/bafzbeigvf25ytwc3akrijfecaotc74udrhcxzh2cx3we5qqnw5vgrei4bm/tcp/1234", 1,
+      ("/ip4/127.0.0.1",
+       "/p2p/QmcgpsyWgH8Y8ajJz1Cu72KnS5uo2Aa2LpzU7kinSupNKC/tcp/1234")),
      ("/ip4/1.2.3.4/tcp/80/unix/a/b/c/d/e/f", -1,
       ("/ip4/1.2.3.4", "/tcp/80", "/unix/a/b/c/d/e/f"))])
 def test_split(proto_string, maxsplit, expected):
@@ -188,7 +190,8 @@ def test_split(proto_string, maxsplit, expected):
      ((b"\x04\x00\x00\x00\x00",), "/ip4/0.0.0.0"),
      (("/ip6/::1",), "/ip6/::1"),
      (("/onion/timaq4ygg2iegci7:80/http",), "/onion/timaq4ygg2iegci7:80/http"),
-     ((b"\x04\x7F\x00\x00\x01", "/p2p/QmcgpsyWgH8Y8ajJz1Cu72KnS5uo2Aa2LpzU7kinSupNKC/tcp/1234",),
+     ((b"\x04\x7F\x00\x00\x01",
+       "/p2p/bafzbeigvf25ytwc3akrijfecaotc74udrhcxzh2cx3we5qqnw5vgrei4bm/tcp/1234",),
       "/ip4/127.0.0.1/p2p/QmcgpsyWgH8Y8ajJz1Cu72KnS5uo2Aa2LpzU7kinSupNKC/tcp/1234"),
      (("/ip4/1.2.3.4", "/tcp/80", "/unix/a/b/c/d/e/f"), "/ip4/1.2.3.4/tcp/80/unix/a/b/c/d/e/f")])
 def test_join(proto_parts, expected):
@@ -223,7 +226,7 @@ def assert_value_for_proto(multi, proto, expected):
 def test_get_value():
     ma = Multiaddr(
         "/ip4/127.0.0.1/utp/tcp/5555/udp/1234/utp/"
-        "p2p/QmbHVEEepCi7rn7VL7Exxpd2Ci9NNB6ifvqwhsrbRMgQFP")
+        "p2p/bafzbeigalb34xlqdtvyklzqa5ibmn6pssqsdskc4ty2e4jxy2kamquh22y")
 
     assert_value_for_proto(ma, P_IP4, "127.0.0.1")
     assert_value_for_proto(ma, P_UTP, None)
@@ -273,7 +276,7 @@ def test_get_value():
 def test_views():
     ma = Multiaddr(
         "/ip4/127.0.0.1/utp/tcp/5555/udp/1234/utp/"
-        "p2p/QmbHVEEepCi7rn7VL7Exxpd2Ci9NNB6ifvqwhsrbRMgQFP")
+        "p2p/bafzbeigalb34xlqdtvyklzqa5ibmn6pssqsdskc4ty2e4jxy2kamquh22y")
 
     for idx, (proto1, proto2, item, value) in enumerate(zip(ma, ma.keys(), ma.items(), ma.values())):  # noqa: E501
         assert (proto1, value) == (proto2, value) == item
