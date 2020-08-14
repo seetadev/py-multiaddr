@@ -14,7 +14,7 @@ __all__ = ("Multiaddr",)
 
 class MultiAddrKeys(collections.abc.KeysView, collections.abc.Sequence):
     def __contains__(self, proto):
-        proto = protocols.protocol_with_any(proto)
+        proto = self._mapping.registry.find(proto)
         return collections.abc.Sequence.__contains__(self, proto)
 
     def __getitem__(self, idx):
@@ -35,7 +35,7 @@ class MultiAddrKeys(collections.abc.KeysView, collections.abc.Sequence):
 class MultiAddrItems(collections.abc.ItemsView, collections.abc.Sequence):
     def __contains__(self, item):
         proto, value = item
-        proto = protocols.protocol_with_any(proto)
+        proto = self._mapping.registry.find(proto)
         return collections.abc.Sequence.__contains__(self, (proto, value))
 
     def __getitem__(self, idx):
@@ -98,15 +98,16 @@ class Multiaddr(collections.abc.Mapping):
     return new objects rather than modify internal state.
     """
 
-    __slots__ = ("_bytes",)
+    __slots__ = ("_bytes", "registry")
 
-    def __init__(self, addr):
+    def __init__(self, addr, *, registry=protocols.REGISTRY):
         """Instantiate a new Multiaddr.
 
         Args:
             addr : A string-encoded or a byte-encoded Multiaddr
 
         """
+        self.registry = registry
         if isinstance(addr, str):
             self._bytes = string_to_bytes(addr)
         elif isinstance(addr, bytes):
@@ -228,7 +229,7 @@ class Multiaddr(collections.abc.Mapping):
         ~multiaddr.exceptions.ProtocolLookupError
             MultiAddr does not contain any instance of this protocol
         """
-        proto = protocols.protocol_with_any(proto)
+        proto = self.registry.find(proto)
         for proto2, value in self.items():
             if proto2 is proto or proto2 == proto:
                 return value

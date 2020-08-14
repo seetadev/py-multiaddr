@@ -59,14 +59,21 @@ class BinaryParseError(ParseError):
         super().__init__(message)
 
 
-class ProtocolManagerError(Error):
+class ProtocolRegistryError(Error):
     pass
 
 
-class ProtocolExistsError(ProtocolManagerError):
-    """
-    Protocol with the given name or code already exists
-    """
+ProtocolManagerError = ProtocolRegistryError
+
+
+class ProtocolRegistryLocked(Error):
+    """Protocol registry was locked and doesn't allow any further additions"""
+    def __init__(self):
+        super().__init__("Protocol registry is locked and does not accept any new values")
+
+
+class ProtocolExistsError(ProtocolRegistryError):
+    """Protocol with the given name or code already exists"""
     def __init__(self, proto, kind="name"):
         self.proto = proto
         self.kind = kind
@@ -76,10 +83,8 @@ class ProtocolExistsError(ProtocolManagerError):
         )
 
 
-class ProtocolNotFoundError(ProtocolManagerError):
-    """
-    No protocol with the given name or code found
-    """
+class ProtocolNotFoundError(ProtocolRegistryError):
+    """No protocol with the given name or code found"""
     def __init__(self, value, kind="name"):
         self.value = value
         self.kind = kind

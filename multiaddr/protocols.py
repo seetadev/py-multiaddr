@@ -3,6 +3,8 @@ import varint
 from . import exceptions
 from .codecs import codec_by_name
 
+__all__ = ("Protocol", "PROTOCOLS", "REGISTRY")
+
 
 # source of protocols https://github.com/multiformats/multicodec/blob/master/table.csv#L382
 # replicating table here to:
@@ -88,7 +90,7 @@ class Protocol:
         )
 
 
-# Protocols is the list of multiaddr protocols supported by this module.
+# List of multiaddr protocols supported by this module by default
 PROTOCOLS = [
     Protocol(P_IP4, 'ip4', 'ip4'),
     Protocol(P_TCP, 'tcp', 'uint16be'),
@@ -118,56 +120,180 @@ PROTOCOLS = [
     Protocol(P_UNIX, 'unix', 'fspath'),
 ]
 
-_names_to_protocols = {proto.name: proto for proto in PROTOCOLS}
-_codes_to_protocols = {proto.code: proto for proto in PROTOCOLS}
+
+class ProtocolRegistry:
+    """A collection of individual Multiaddr protocols indexed for fast lookup"""
+    __slots__ = ("_codes_to_protocols", "_locked", "_names_to_protocols")
+
+    def __init__(self, protocols=()):
+        self._locked = False
+        self._codes_to_protocols = {proto.code: proto for proto in protocols}
+        self._names_to_protocols = {proto.name: proto for proto in protocols}
+
+    def add(self, proto):
+        """Add the given protocol description to this registry
+
+        Raises
+        ------
+        ~multiaddr.exceptions.ProtocolRegistryLocked
+            Protocol registry is locked and does not accept any new entries.
+
+            You can use `.copy(unlock=True)` to copy an existing locked registry
+            and unlock it.
+        ~multiaddr.exceptions.ProtocolExistsError
+            A protocol with the given name or code already exists.
+        """
+        if self._locked:
+            raise exceptions.ProtocolRegistryLocked()
+
+        if proto.name in self._names_to_protocols:
+            raise exceptions.ProtocolExistsError(proto, "name")
+
+        if proto.code in self._codes_to_protocols:
+            raise exceptions.ProtocolExistsError(proto, "code")
+
+        self._names_to_protocols[proto.name] = proto
+        self._codes_to_protocols[proto.code] = proto
+        return proto
+
+    def add_alias_name(self, proto, alias_name):
+        """Add an alternate name for an existing protocol description to the registry
+
+        Raises
+        ------
+        ~multiaddr.exceptions.ProtocolRegistryLocked
+            Protocol registry is locked and does not accept any new entries.
+
+            You can use `.copy(unlock=True)` to copy an existing locked registry
+            and unlock it.
+        ~multiaddr.exceptions.ProtocolExistsError
+            A protocol with the given name already exists.
+        ~multiaddr.exceptions.ProtocolNotFoundError
+            No protocol matching *proto* could be found.
+        """
+        if self._locked:
+            raise exceptions.ProtocolRegistryLocked()
+
+        proto = self.find(proto)
+        assert self._names_to_protocols.get(proto.name) is proto, \
+               "Protocol to alias must have already been added to the registry"
+
+        if alias_name in self._names_to_protocols:
+            raise exceptions.ProtocolExistsError(self._names_to_protocols[alias_name], "name")
+
+        self._names_to_protocols[alias_name] = proto
+
+    def add_alias_code(self, proto, alias_code):
+        """Add an alternate code for an existing protocol description to the registry
+
+        Raises
+        ------
+        ~multiaddr.exceptions.ProtocolRegistryLocked
+            Protocol registry is locked and does not accept any new entries.
+
+            You can use `.copy(unlock=True)` to copy an existing locked registry
+            and unlock it.
+        ~multiaddr.exceptions.ProtocolExistsError
+            A protocol with the given code already exists.
+        ~multiaddr.exceptions.ProtocolNotFoundError
+            No protocol matching *proto* could be found.
+        """
+        if self._locked:
+            raise exceptions.ProtocolRegistryLocked()
+
+        proto = self.find(proto)
+        assert self._codes_to_protocols.get(proto.code) is proto, \
+               "Protocol to alias must have already been added to the registry"
+
+        if alias_code in self._codes_to_protocols:
+            raise exceptions.ProtocolExistsError(self._codes_to_protocols[alias_code], "name")
+
+        self._codes_to_protocols[alias_code] = proto
+
+    def lock(self):
+        """Lock this registry instance to deny any further changes"""
+        self._locked = True
+
+    @property
+    def locked(self):
+        return self._locked
+
+    def copy(self, *, unlock=False):
+        """Create a copy of this protocol registry
+
+        Arguments
+        ---------
+        unlock
+            Create the copied registry unlocked even if the current one is locked?
+        """
+        registry = ProtocolRegistry()
+        registry._locked = self._locked and not unlock
+        registry._codes_to_protocols = self._codes_to_protocols.copy()
+        registry._names_to_protocols = self._names_to_protocols.copy()
+        return registry
+
+    __copy__ = copy
+
+    def find_by_name(self, name):
+        """Look up a protocol by its human-readable name
+
+        Raises
+        ------
+        ~multiaddr.exceptions.ProtocolNotFoundError
+        """
+        if name not in self._names_to_protocols:
+            raise exceptions.ProtocolNotFoundError(name, "name")
+        return self._names_to_protocols[name]
+
+    def find_by_code(self, code):
+        """Look up a protocol by its binary representation code
+
+        Raises
+        ------
+        ~multiaddr.exceptions.ProtocolNotFoundError
+        """
+        if code not in self._codes_to_protocols:
+            raise exceptions.ProtocolNotFoundError(code, "code")
+        return self._codes_to_protocols[code]
+
+    def find(self, proto):
+        """Look up a protocol by its name or code, return existing protocol objects unchanged
+
+        Raises
+        ------
+        ~multiaddr.exceptions.ProtocolNotFoundError
+        """
+        if isinstance(proto, Protocol):
+            return proto
+        elif isinstance(proto, str):
+            return self.find_by_name(proto)
+        elif isinstance(proto, int):
+            return self.find_by_code(proto)
+        else:
+            raise TypeError("Protocol object, name or code expected, got {0!r}".format(proto))
 
 
-def add_protocol(proto):
-    if proto.name in _names_to_protocols:
-        raise exceptions.ProtocolExistsError(proto, "name")
-
-    if proto.code in _codes_to_protocols:
-        raise exceptions.ProtocolExistsError(proto, "code")
-
-    PROTOCOLS.append(proto)
-    _names_to_protocols[proto.name] = proto
-    _codes_to_protocols[proto.code] = proto
-    return None
+REGISTRY = ProtocolRegistry(PROTOCOLS)
+REGISTRY.add_alias_name("p2p", "ipfs")
+REGISTRY.lock()
 
 
 def protocol_with_name(name):
-    if name not in _names_to_protocols:
-        raise exceptions.ProtocolNotFoundError(name, "name")
-    return _names_to_protocols[name]
+    return REGISTRY.find_by_name(name)
 
 
 def protocol_with_code(code):
-    if code not in _codes_to_protocols:
-        raise exceptions.ProtocolNotFoundError(code, "code")
-    return _codes_to_protocols[code]
+    return REGISTRY.find_by_code(code)
 
 
 def protocol_with_any(proto):
-    if isinstance(proto, Protocol):
-        return proto
-    elif isinstance(proto, int):
-        return protocol_with_code(proto)
-    elif isinstance(proto, str):
-        return protocol_with_name(proto)
-    else:
-        raise TypeError("Protocol object, name or code expected, got {0!r}".format(proto))
+    return REGISTRY.find(proto)
 
 
 def protocols_with_string(string):
     """Return a list of protocols matching given string."""
-    # Normalize string
-    while "//" in string:
-        string = string.replace("//", "/")
-    string = string.strip("/")
-    if not string:
-        return []
-
     ret = []
     for name in string.split("/"):
-        ret.append(protocol_with_name(name))
+        if len(name) > 0:
+            ret.append(protocol_with_name(name))
     return ret
