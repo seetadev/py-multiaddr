@@ -36,35 +36,6 @@ P_P2P_WEBRTC_STAR = 0x0113
 P_P2P_WEBRTC_DIRECT = 0x0114
 P_UNIX = 0x0190
 
-_CODES = [
-    P_IP4,
-    P_IP6,
-    P_IP6ZONE,
-    P_TCP,
-    P_UDP,
-    P_DCCP,
-    P_SCTP,
-    P_UDT,
-    P_UTP,
-    P_P2P,
-    P_HTTP,
-    P_HTTPS,
-    P_QUIC,
-    P_WS,
-    P_WSS,
-    P_ONION,
-    P_ONION3,
-    P_P2P_CIRCUIT,
-    P_DNS,
-    P_DNS4,
-    P_DNS6,
-    P_DNSADDR,
-    P_P2P_WEBSOCKET_STAR,
-    P_P2P_WEBRTC_STAR,
-    P_P2P_WEBRTC_DIRECT,
-    P_UNIX,
-]
-
 
 class Protocol:
     __slots__ = [
