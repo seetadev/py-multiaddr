@@ -23,6 +23,7 @@ P_UTP = 0x012E
 P_P2P = 0x01A5
 P_HTTP = 0x01E0
 P_HTTPS = 0x01BB
+P_TLS = 0x01C0
 P_QUIC = 0x01CC
 P_WS = 0x01DD
 P_WSS = 0x01DE
@@ -111,6 +112,7 @@ PROTOCOLS = [
     Protocol(P_QUIC, 'quic', None),
     Protocol(P_HTTP, 'http', None),
     Protocol(P_HTTPS, 'https', None),
+    Protocol(P_TLS, 'tls', None),
     Protocol(P_WS, 'ws', None),
     Protocol(P_WSS, 'wss', None),
     Protocol(P_P2P_WEBSOCKET_STAR, 'p2p-websocket-star', None),
