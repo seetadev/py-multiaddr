@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from .multiaddr import Multiaddr  # NOQA
 
 __author__ = 'Steven Buss'

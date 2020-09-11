@@ -15,7 +15,7 @@ class ProtocolLookupError(LookupError):
         self.proto = proto
         self.string = string
 
-        super(ProtocolLookupError, self).__init__(
+        super().__init__(
             "MultiAddr {0!r} does not contain protocol {1}".format(string, proto)
         )
 
@@ -40,7 +40,7 @@ class StringParseError(ParseError):
         else:
             message = "Invalid MultiAddr {0!r}: {1}".format(string, message)
 
-        super(StringParseError, self).__init__(message)
+        super().__init__(message)
 
 
 class BinaryParseError(ParseError):
@@ -56,34 +56,39 @@ class BinaryParseError(ParseError):
 
         message = "Invalid binary MultiAddr protocol {0}: {1}".format(protocol, message)
 
-        super(BinaryParseError, self).__init__(message)
+        super().__init__(message)
 
 
-class ProtocolManagerError(Error):
+class ProtocolRegistryError(Error):
     pass
 
 
-class ProtocolExistsError(ProtocolManagerError):
-    """
-    Protocol with the given name or code already exists
-    """
+ProtocolManagerError = ProtocolRegistryError
+
+
+class ProtocolRegistryLocked(Error):
+    """Protocol registry was locked and doesn't allow any further additions"""
+    def __init__(self):
+        super().__init__("Protocol registry is locked and does not accept any new values")
+
+
+class ProtocolExistsError(ProtocolRegistryError):
+    """Protocol with the given name or code already exists"""
     def __init__(self, proto, kind="name"):
         self.proto = proto
         self.kind = kind
 
-        super(ProtocolExistsError, self).__init__(
+        super().__init__(
             "Protocol with {0} {1!r} already exists".format(kind, getattr(proto, kind))
         )
 
 
-class ProtocolNotFoundError(ProtocolManagerError):
-    """
-    No protocol with the given name or code found
-    """
+class ProtocolNotFoundError(ProtocolRegistryError):
+    """No protocol with the given name or code found"""
     def __init__(self, value, kind="name"):
         self.value = value
         self.kind = kind
 
-        super(ProtocolNotFoundError, self).__init__(
+        super().__init__(
             "No protocol with {0} {1!r} found".format(kind, value)
         )

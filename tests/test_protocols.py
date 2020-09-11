@@ -1,4 +1,3 @@
-import six
 import pytest
 import varint
 
@@ -46,7 +45,6 @@ def test_invalid_name(valid_params, invalid_name):
         protocols.Protocol(**valid_params)
 
 
-@pytest.mark.skipif(six.PY2, reason="Binary strings are allowed on Python 2")
 @pytest.mark.parametrize("invalid_codec", [b"ip4", 123, 0.123])
 def test_invalid_codec(valid_params, invalid_codec):
     valid_params['codec'] = invalid_codec
@@ -54,13 +52,13 @@ def test_invalid_codec(valid_params, invalid_codec):
         protocols.Protocol(**valid_params)
 
 
-@pytest.mark.parametrize("name", ["foo-str", u"foo-u"])
+@pytest.mark.parametrize("name", ["foo-str", "foo-u"])
 def test_valid_names(valid_params, name):
     valid_params['name'] = name
     test_valid(valid_params)
 
 
-@pytest.mark.parametrize("codec", ["ip4", u"ip6"])
+@pytest.mark.parametrize("codec", ["ip4", "ip6"])
 def test_valid_codecs(valid_params, codec):
     valid_params['codec'] = codec
     test_valid(valid_params)
@@ -73,6 +71,8 @@ def test_protocol_with_name():
     assert proto.size == 32
     assert proto.vcode == varint.encode(protocols.P_IP4)
     assert hash(proto) == protocols.P_IP4
+    assert protocols.protocol_with_any('ip4') == proto
+    assert protocols.protocol_with_any(proto) == proto
 
     with pytest.raises(exceptions.ProtocolNotFoundError):
         proto = protocols.protocol_with_name('foo')
@@ -85,6 +85,8 @@ def test_protocol_with_code():
     assert proto.size == 32
     assert proto.vcode == varint.encode(protocols.P_IP4)
     assert hash(proto) == protocols.P_IP4
+    assert protocols.protocol_with_any(protocols.P_IP4) == proto
+    assert protocols.protocol_with_any(proto) == proto
 
     with pytest.raises(exceptions.ProtocolNotFoundError):
         proto = protocols.protocol_with_code(1234)
@@ -129,35 +131,54 @@ def test_protocols_with_string_mixed():
         protocols.protocols_with_string(ins)
 
 
-# add_protocol is stateful, so we need to mock out
-# multiaddr.protocols.PROTOCOLS
-@pytest.fixture()
-def patch_protocols(monkeypatch):
-    monkeypatch.setattr(protocols, 'PROTOCOLS', [])
-    monkeypatch.setattr(protocols, '_names_to_protocols', {})
-    monkeypatch.setattr(protocols, '_codes_to_protocols', {})
-
-
-def test_add_protocol(patch_protocols, valid_params):
+def test_add_protocol(valid_params):
+    registry = protocols.ProtocolRegistry()
     proto = protocols.Protocol(**valid_params)
-    protocols.add_protocol(proto)
-    assert protocols.PROTOCOLS == [proto]
-    assert proto.name in protocols._names_to_protocols
-    assert proto.code in protocols._codes_to_protocols
-    proto = protocols.Protocol(protocols.P_TCP, "tcp", "uint16be")
+    registry.add(proto)
+    assert proto.name in registry._names_to_protocols
+    assert proto.code in registry._codes_to_protocols
+    assert registry.find(proto.name) is registry.find(proto.code) is proto
 
 
-def test_add_protocol_twice(patch_protocols, valid_params):
-    proto = protocols.Protocol(**valid_params)
-    protocols.add_protocol(proto)
+def test_add_protocol_twice(valid_params):
+    registry = protocols.ProtocolRegistry()
+    proto = registry.add(protocols.Protocol(**valid_params))
+
     with pytest.raises(exceptions.ProtocolExistsError):
-        protocols.add_protocol(proto)
-    del protocols._names_to_protocols[proto.name]
+        registry.add(proto)
+    del registry._names_to_protocols[proto.name]
     with pytest.raises(exceptions.ProtocolExistsError):
-        protocols.add_protocol(proto)
-    del protocols._codes_to_protocols[proto.code]
-    protocols.add_protocol(proto)
-    assert protocols.PROTOCOLS == [proto, proto]
+        registry.add(proto)
+    del registry._codes_to_protocols[proto.code]
+    registry.add(proto)
+
+
+def test_add_protocol_alias():
+    registry = protocols.REGISTRY.copy(unlock=True)
+    registry.add_alias_name("tcp", "abcd")
+    registry.add_alias_code("tcp", 123456)
+
+    with pytest.raises(exceptions.ProtocolExistsError):
+        registry.add_alias_name("tcp", "abcd")
+    with pytest.raises(exceptions.ProtocolExistsError):
+        registry.add_alias_code("tcp", 123456)
+
+    assert registry.find("tcp") is registry.find("abcd")
+    assert registry.find("tcp") is registry.find(123456)
+
+
+def test_add_protocol_lock(valid_params):
+    registry = protocols.REGISTRY.copy(unlock=True)
+    assert not registry.locked
+    registry.lock()
+    assert registry.locked
+
+    with pytest.raises(exceptions.ProtocolRegistryLocked):
+        registry.add(protocols.Protocol(**valid_params))
+    with pytest.raises(exceptions.ProtocolRegistryLocked):
+        registry.add_alias_name("tcp", "abcdef")
+    with pytest.raises(exceptions.ProtocolRegistryLocked):
+        registry.add_alias_code(0x4, 0x123456)
 
 
 def test_protocol_repr():
