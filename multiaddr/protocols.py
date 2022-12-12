@@ -25,6 +25,7 @@ P_HTTP = 0x01E0
 P_HTTPS = 0x01BB
 P_TLS = 0x01C0
 P_QUIC = 0x01CC
+P_QUIC1 = 0x01CD
 P_WS = 0x01DD
 P_WSS = 0x01DE
 P_ONION = 0x01BC
@@ -110,6 +111,7 @@ PROTOCOLS = [
     Protocol(P_ONION, 'onion', 'onion'),
     Protocol(P_ONION3, 'onion3', 'onion3'),
     Protocol(P_QUIC, 'quic', None),
+    Protocol(P_QUIC1, 'quic-v1', None),
     Protocol(P_HTTP, 'http', None),
     Protocol(P_HTTPS, 'https', None),
     Protocol(P_TLS, 'tls', None),
