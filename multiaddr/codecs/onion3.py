@@ -50,6 +50,6 @@ class Codec(CodecBase):
             port = str(int.from_bytes(buf[35:], byteorder='big'))
             if not 1 <= int(port) <= 65535:
                 raise ValueError("Invalid onion3 port range")
-            return f"{addr}:{port}"
+            return f"{addr}:{port}"  # noqa: E231
         except (ValueError, UnicodeDecodeError, binascii.Error) as e:
             raise BinaryParseError(str(e), buf, proto)

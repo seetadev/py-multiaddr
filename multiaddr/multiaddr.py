@@ -1,3 +1,4 @@
+# flake8: noqa: F811
 import collections.abc
 from typing import Any, Iterator, List, Optional, Tuple, TypeVar, Union, Sequence, overload
 
@@ -48,7 +49,7 @@ class MultiAddrKeys(collections.abc.KeysView[Any], collections.abc.Sequence[Any]
 class MultiAddrItems(
     collections.abc.ItemsView[Any, Any],
     collections.abc.Sequence[Tuple[Any, Any]]
-):
+):  # noqa: F811
     def __init__(self, mapping: 'Multiaddr') -> None:
         self._mapping = mapping
         super().__init__(mapping)
@@ -66,14 +67,14 @@ class MultiAddrItems(
     @overload
     def __getitem__(self, idx: slice) -> Sequence[Tuple[Any, Any]]: ...
 
-    def __getitem__(
+    def __getitem__(  # noqa: F811
         self,
         idx: Union[int, slice]
     ) -> Union[Tuple[Any, Any], Sequence[Tuple[Any, Any]]]:
         if isinstance(idx, slice):
             return list(self)[idx]
         if idx < 0:
-            idx = len(self)+idx
+            idx = len(self) + idx
         for idx2, item in enumerate(self):
             if idx2 == idx:
                 return item

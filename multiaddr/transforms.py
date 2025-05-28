@@ -110,7 +110,10 @@ def string_iter(string: str) -> Generator[Tuple[Protocol, CodecBase, Optional[st
             proto = protocol_with_name(element)
             print(f"[DEBUG] Found protocol: {proto.name}")
             if proto.codec is None:
-                codec = None
+                # Create a dummy codec with size 0 for protocols without a codec
+                codec = CodecBase()
+                codec.SIZE = 0
+                codec.IS_PATH = False
             else:
                 codec = codec_by_name(proto.codec)
         except (ImportError, exceptions.ProtocolNotFoundError) as exc:
@@ -145,7 +148,11 @@ def string_iter(string: str) -> Generator[Tuple[Protocol, CodecBase, Optional[st
                     sp.pop(0)
                 if not sp:
                     print(f"[DEBUG] Protocol {proto.name} requires address but none left")
-                    raise exceptions.StringParseError("Protocol requires address", string, proto.name)
+                    raise exceptions.StringParseError(
+                        "Protocol requires address",
+                        string,
+                        proto.name
+                    )
                 next_elem = sp[0]
                 print(f"[DEBUG] Next element for value: '{next_elem}'")
                 # First try to validate as value for current protocol
@@ -159,9 +166,12 @@ def string_iter(string: str) -> Generator[Tuple[Protocol, CodecBase, Optional[st
                         try:
                             # If this succeeds, it's a protocol name
                             protocol_with_name(next_elem)
-                            # If we have a protocol that requires a value and we're seeing another protocol,
+                            # If we have a protocol that requires a value and we're seeing
+                            # another protocol,
                             # raise a StringParseError
-                            print(f"[DEBUG] Next element '{next_elem}' is a protocol name. Error!")
+                            print(
+                                f"[DEBUG] Next element '{next_elem}' is a protocol name. Error!"
+                            )
                             raise exceptions.StringParseError(
                                 f"Protocol {proto.name} requires a value",
                                 string,
