@@ -1,4 +1,5 @@
 import varint
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from . import exceptions
 from .codecs import codec_by_name
@@ -48,7 +49,7 @@ class Protocol:
         "codec",  # string
     ]
 
-    def __init__(self, code, name, codec):
+    def __init__(self, code: int, name: str, codec: Optional[str]) -> None:
         if not isinstance(code, int):
             raise TypeError("code must be an integer")
         if not isinstance(name, str):
@@ -61,18 +62,18 @@ class Protocol:
         self.codec = codec
 
     @property
-    def size(self):
+    def size(self) -> int:
         return codec_by_name(self.codec).SIZE
 
     @property
-    def path(self):
+    def path(self) -> bool:
         return codec_by_name(self.codec).IS_PATH
 
     @property
-    def vcode(self):
+    def vcode(self) -> bytes:
         return varint.encode(self.code)
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         if not isinstance(other, Protocol):
             return NotImplemented
 
@@ -81,14 +82,16 @@ class Protocol:
                     self.codec == other.codec,
                     self.path == other.path))
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return self.code
 
-    def __repr__(self):
-        return "Protocol(code={code!r}, name={name!r}, codec={codec!r})".format(
-            code=self.code,
-            name=self.name,
-            codec=self.codec,
+    def __repr__(self) -> str:
+        return (
+            "Protocol(code={code!r}, name={name!r}, codec={codec!r})".format(
+                code=self.code,
+                name=self.name,
+                codec=self.codec,
+            )
         )
 
 
@@ -129,12 +132,19 @@ class ProtocolRegistry:
     """A collection of individual Multiaddr protocols indexed for fast lookup"""
     __slots__ = ("_codes_to_protocols", "_locked", "_names_to_protocols")
 
-    def __init__(self, protocols=()):
+    def __init__(self, protocols: Union[List[Protocol], Tuple[Protocol, ...]] = ()) -> None:
         self._locked = False
-        self._codes_to_protocols = {proto.code: proto for proto in protocols}
-        self._names_to_protocols = {proto.name: proto for proto in protocols}
+        protocols_tuple = tuple(protocols) if isinstance(protocols, list) else protocols
+        self._codes_to_protocols: Dict[int, Protocol] = {
+            proto.code: proto
+            for proto in protocols_tuple
+        }
+        self._names_to_protocols: Dict[str, Protocol] = {
+            proto.name: proto
+            for proto in protocols_tuple
+        }
 
-    def add(self, proto):
+    def add(self, proto: Protocol) -> Protocol:
         """Add the given protocol description to this registry
 
         Raises
@@ -160,7 +170,7 @@ class ProtocolRegistry:
         self._codes_to_protocols[proto.code] = proto
         return proto
 
-    def add_alias_name(self, proto, alias_name):
+    def add_alias_name(self, proto: Union[Protocol, str], alias_name: str) -> None:
         """Add an alternate name for an existing protocol description to the registry
 
         Raises
@@ -180,14 +190,14 @@ class ProtocolRegistry:
 
         proto = self.find(proto)
         assert self._names_to_protocols.get(proto.name) is proto, \
-               "Protocol to alias must have already been added to the registry"
+            "Protocol to alias must have already been added to the registry"
 
         if alias_name in self._names_to_protocols:
             raise exceptions.ProtocolExistsError(self._names_to_protocols[alias_name], "name")
 
         self._names_to_protocols[alias_name] = proto
 
-    def add_alias_code(self, proto, alias_code):
+    def add_alias_code(self, proto: Union[Protocol, int], alias_code: int) -> None:
         """Add an alternate code for an existing protocol description to the registry
 
         Raises
@@ -207,22 +217,22 @@ class ProtocolRegistry:
 
         proto = self.find(proto)
         assert self._codes_to_protocols.get(proto.code) is proto, \
-               "Protocol to alias must have already been added to the registry"
+            "Protocol to alias must have already been added to the registry"
 
         if alias_code in self._codes_to_protocols:
             raise exceptions.ProtocolExistsError(self._codes_to_protocols[alias_code], "name")
 
         self._codes_to_protocols[alias_code] = proto
 
-    def lock(self):
+    def lock(self) -> None:
         """Lock this registry instance to deny any further changes"""
         self._locked = True
 
     @property
-    def locked(self):
+    def locked(self) -> bool:
         return self._locked
 
-    def copy(self, *, unlock=False):
+    def copy(self, *, unlock: bool = False) -> 'ProtocolRegistry':
         """Create a copy of this protocol registry
 
         Arguments
@@ -238,34 +248,39 @@ class ProtocolRegistry:
 
     __copy__ = copy
 
-    def find_by_name(self, name):
-        """Look up a protocol by its human-readable name
+    def find_by_name(self, name: str) -> Protocol:
+        """Find a protocol by its name
 
         Raises
         ------
         ~multiaddr.exceptions.ProtocolNotFoundError
+            No protocol matching *name* could be found.
         """
-        if name not in self._names_to_protocols:
-            raise exceptions.ProtocolNotFoundError(name, "name")
-        return self._names_to_protocols[name]
+        try:
+            return self._names_to_protocols[name]
+        except KeyError:
+            raise exceptions.ProtocolNotFoundError(name)
 
-    def find_by_code(self, code):
-        """Look up a protocol by its binary representation code
+    def find_by_code(self, code: int) -> Protocol:
+        """Find a protocol by its code
 
         Raises
         ------
         ~multiaddr.exceptions.ProtocolNotFoundError
+            No protocol matching *code* could be found.
         """
-        if code not in self._codes_to_protocols:
-            raise exceptions.ProtocolNotFoundError(code, "code")
-        return self._codes_to_protocols[code]
+        try:
+            return self._codes_to_protocols[code]
+        except KeyError:
+            raise exceptions.ProtocolNotFoundError(code)
 
-    def find(self, proto):
-        """Look up a protocol by its name or code, return existing protocol objects unchanged
+    def find(self, proto: Union[Protocol, str, int]) -> Protocol:
+        """Find a protocol by its name, code, or Protocol instance
 
         Raises
         ------
         ~multiaddr.exceptions.ProtocolNotFoundError
+            No protocol matching *proto* could be found.
         """
         if isinstance(proto, Protocol):
             return proto
@@ -274,30 +289,159 @@ class ProtocolRegistry:
         elif isinstance(proto, int):
             return self.find_by_code(proto)
         else:
-            raise TypeError("Protocol object, name or code expected, got {0!r}".format(proto))
+            raise TypeError("Protocol must be a string, integer, or Protocol instance")
 
 
+# Create a registry with all the default protocols
 REGISTRY = ProtocolRegistry(PROTOCOLS)
-REGISTRY.add_alias_name("p2p", "ipfs")
 REGISTRY.lock()
 
 
-def protocol_with_name(name):
+def protocol_with_name(name: str) -> Protocol:
+    """Find a protocol by its name
+
+    Raises
+    ------
+    ~multiaddr.exceptions.ProtocolNotFoundError
+        No protocol matching *name* could be found.
+    """
     return REGISTRY.find_by_name(name)
 
 
-def protocol_with_code(code):
+def protocol_with_code(code: int) -> Protocol:
+    """Find a protocol by its code
+
+    Raises
+    ------
+    ~multiaddr.exceptions.ProtocolNotFoundError
+        No protocol matching *code* could be found.
+    """
     return REGISTRY.find_by_code(code)
 
 
-def protocol_with_any(proto):
+def protocol_with_any(proto: Union[Protocol, str, int]) -> Protocol:
+    """Find a protocol by its name, code, or Protocol instance
+
+    Raises
+    ------
+    ~multiaddr.exceptions.ProtocolNotFoundError
+        No protocol matching *proto* could be found.
+    """
     return REGISTRY.find(proto)
 
 
-def protocols_with_string(string):
-    """Return a list of protocols matching given string."""
-    ret = []
-    for name in string.split("/"):
-        if len(name) > 0:
-            ret.append(protocol_with_name(name))
-    return ret
+def protocols_with_string(string: str) -> List[Protocol]:
+    """Find all protocols that are part of the given string
+
+    Raises
+    ------
+    ~multiaddr.exceptions.StringParseError
+        The given string is not a valid multiaddr string.
+    ~multiaddr.exceptions.ProtocolNotFoundError
+        If a protocol in the string is not found.
+    """
+    if not string:
+        return []
+    if not string.startswith('/'):
+        string = '/' + string
+    # consume trailing slashes
+    string = string.rstrip('/')
+    sp = string.split('/')
+
+    # skip the first element, since it starts with /
+    sp.pop(0)
+    protocols = []
+    while sp:
+        element = sp.pop(0)
+        if not element:  # Skip empty elements from multiple slashes
+            continue
+        try:
+            proto = protocol_with_name(element)
+            protocols.append(proto)
+            if proto.codec is not None:
+                codec = codec_by_name(proto.codec)
+                if proto.name == 'unix':
+                    # For unix, consume all remaining elements as part of the path
+                    if sp:
+                        path_value = '/'.join(sp)
+                        try:
+                            codec.to_bytes(proto, path_value)
+                            sp.clear()
+                            continue
+                        except Exception as exc:
+                            raise exceptions.StringParseError(
+                                f"Invalid path value for protocol {proto.name}",
+                                string,
+                                proto.name,
+                                exc
+                            ) from exc
+                    else:
+                        raise exceptions.StringParseError(
+                            f"Protocol {proto.name} requires a path value",
+                            string,
+                            proto.name,
+                            ValueError("Missing required path value")
+                        )
+                elif sp:
+                    # Find next non-empty element
+                    next_elem = None
+                    while sp and not next_elem:
+                        next_elem = sp[0]
+                        if not next_elem:  # Skip empty elements
+                            sp.pop(0)
+                            continue
+
+                    if next_elem:  # Only proceed if we found a non-empty element
+                        # First try to validate as value for current protocol
+                        try:
+                            codec.to_bytes(proto, next_elem)
+                            sp.pop(0)
+                            continue
+                        except Exception as exc:
+                            # If value validation fails, check if it's a protocol name
+                            if next_elem.isalnum():
+                                try:
+                                    protocol_with_name(next_elem)
+                                    if proto.name in ['ip6zone']:
+                                        if not any(codec.to_bytes(proto, val) for val in sp if val):
+                                            raise exceptions.StringParseError(
+                                                f"Protocol {proto.name} requires a value",
+                                                string,
+                                                proto.name,
+                                                ValueError("Missing required value")
+                                            )
+                                    continue
+                                except exceptions.ProtocolNotFoundError:
+                                    raise exceptions.StringParseError(
+                                        f"Invalid value for protocol {proto.name}",
+                                        string,
+                                        proto.name,
+                                        exc
+                                    ) from exc
+                            else:
+                                raise exceptions.StringParseError(
+                                    f"Invalid value for protocol {proto.name}",
+                                    string,
+                                    proto.name,
+                                    exc
+                                ) from exc
+                    else:
+                        if proto.name in ['ip6zone']:
+                            raise exceptions.StringParseError(
+                                f"Protocol {proto.name} requires a value",
+                                string,
+                                proto.name,
+                                ValueError("Missing required value")
+                            )
+                else:
+                    if proto.name in ['ip6zone']:
+                        raise exceptions.StringParseError(
+                            f"Protocol {proto.name} requires a value",
+                            string,
+                            proto.name,
+                            ValueError("Missing required value")
+                        )
+        except exceptions.ProtocolNotFoundError as exc:
+            raise exc
+
+    return protocols

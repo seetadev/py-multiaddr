@@ -134,8 +134,10 @@ def test_eq():
 def test_protocols():
     ma = Multiaddr("/ip4/127.0.0.1/udp/1234")
     protos = ma.protocols()
-    assert protos[0].code == protocol_with_name("ip4").code
-    assert protos[1].code == protocol_with_name("udp").code
+    # Convert to list to access elements by index
+    proto_list = list(protos)
+    assert proto_list[0].code == protocol_with_name("ip4").code
+    assert proto_list[1].code == protocol_with_name("udp").code
 
 
 @pytest.mark.parametrize(
@@ -161,13 +163,16 @@ def test_protocols_with_string(proto_string, expected):
 
 
 @pytest.mark.parametrize(
-    'proto_string',
-    ["dsijafd",
-     "/ip4/tcp/fidosafoidsa",
-     "////////ip4/tcp/21432141/////////"])
-def test_invalid_protocols_with_string(proto_string):
-    with pytest.raises(ProtocolNotFoundError):
-        protocols_with_string(proto_string)
+    'addr,error',
+    [
+        ('dsijafd', ProtocolNotFoundError),
+        ('/ip4/tcp/fidosafoidsa', StringParseError),
+        ('////////ip4/tcp/21432141/////////', StringParseError),
+    ],
+)
+def test_invalid_protocols_with_string(addr, error):
+    with pytest.raises(error):
+        protocols_with_string(addr)
 
 
 @pytest.mark.parametrize(
@@ -277,44 +282,55 @@ def test_get_value():
 def test_views():
     ma = Multiaddr(
         "/ip4/127.0.0.1/utp/tcp/5555/udp/1234/utp/"
-        "p2p/bafzbeigalb34xlqdtvyklzqa5ibmn6pssqsdskc4ty2e4jxy2kamquh22y")
+        "p2p/bafzbeigalb34xlqdtvyklzqa5ibmn6pssqsdskc4ty2e4jxy2kamquh22y"
+    )
 
-    for idx, (proto1, proto2, item, value) in enumerate(zip(ma, ma.keys(), ma.items(), ma.values())):  # noqa: E501
+    # Convert views to lists for indexing
+    keys_list = list(ma.keys())
+    items_list = list(ma.items())
+    values_list = list(ma.values())
+
+    for idx, (proto1, proto2, item, value) in enumerate(
+        zip(ma, keys_list, items_list, values_list)
+    ):
         assert (proto1, value) == (proto2, value) == item
         assert proto1 in ma
         assert proto2 in ma.keys()
         assert item in ma.items()
         assert value in ma.values()
-        assert ma.keys()[idx] == ma.keys()[idx-len(ma)] == proto1 == proto2
-        assert ma.items()[idx] == ma.items()[idx-len(ma)] == item
-        assert ma.values()[idx] == ma.values()[idx-len(ma)] == ma[proto1] == value
+        assert keys_list[idx] == keys_list[idx-len(ma)] == proto1 == proto2
+        assert items_list[idx] == items_list[idx-len(ma)] == item
+        assert (
+            values_list[idx] == values_list[idx-len(ma)] == ma[proto1] == value
+        )
 
-    assert len(ma.keys()) == len(ma.items()) == len(ma.values()) == len(ma)
+    assert len(keys_list) == len(items_list) == len(values_list) == len(ma)
     assert len(list(ma.keys())) == len(ma.keys())
     assert len(list(ma.items())) == len(ma.items())
     assert len(list(ma.values())) == len(ma.values())
 
+    # Test out of bounds
     with pytest.raises(IndexError):
-        ma.keys()[len(ma)]
+        keys_list[len(ma)]
     with pytest.raises(IndexError):
-        ma.items()[len(ma)]
+        items_list[len(ma)]
     with pytest.raises(IndexError):
-        ma.values()[len(ma)]
+        values_list[len(ma)]
 
 
 def test_bad_initialization_no_params():
     with pytest.raises(TypeError):
-        Multiaddr()
+        Multiaddr()  # type: ignore
 
 
 def test_bad_initialization_too_many_params():
     with pytest.raises(TypeError):
-        Multiaddr("/ip4/0.0.0.0", "")
+        Multiaddr("/ip4/0.0.0.0", "")  # type: ignore
 
 
 def test_bad_initialization_wrong_type():
     with pytest.raises(TypeError):
-        Multiaddr(42)
+        Multiaddr(42)  # type: ignore
 
 
 def test_value_for_protocol_argument_wrong_type():
@@ -360,3 +376,55 @@ def test_hash():
     addr_bytes = Multiaddr("/ip4/127.0.0.1/udp/1234").to_bytes()
 
     assert hash(Multiaddr(addr_bytes)) == hash(addr_bytes)
+
+
+def test_sequence_behavior():
+    ma = Multiaddr("/ip4/127.0.0.1/udp/1234")
+    proto1 = protocol_with_name("ip4")
+    proto2 = protocol_with_name("udp")
+    value1 = "127.0.0.1"
+    value2 = "1234"
+    item1 = (proto1, value1)
+    item2 = (proto2, value2)
+
+    # Test positive indices
+    for idx, (proto, value, item) in enumerate(
+        zip(
+            [proto1, proto2],
+            [value1, value2],
+            [item1, item2]
+        )
+    ):
+        assert proto in ma
+        assert value in ma.values()
+        assert item in ma.items()
+        assert list(ma.keys())[idx] == list(ma.keys())[idx-len(ma)] == proto
+        assert list(ma.items())[idx] == list(ma.items())[idx-len(ma)] == item
+        assert (
+            list(ma.values())[idx] == list(ma.values())[idx-len(ma)] == value
+        )
+
+    # Test negative indices
+    for idx, (proto, value, item) in enumerate(
+        zip(
+            [proto1, proto2],
+            [value1, value2],
+            [item1, item2]
+        )
+    ):
+        assert proto in ma
+        assert value in ma.values()
+        assert item in ma.items()
+        assert list(ma.keys())[idx] == list(ma.keys())[idx-len(ma)] == proto
+        assert list(ma.items())[idx] == list(ma.items())[idx-len(ma)] == item
+        assert (
+            list(ma.values())[idx] == list(ma.values())[idx-len(ma)] == value
+        )
+
+    # Test out of bounds
+    with pytest.raises(IndexError):
+        list(ma.keys())[len(ma)]
+    with pytest.raises(IndexError):
+        list(ma.items())[len(ma)]
+    with pytest.raises(IndexError):
+        list(ma.values())[len(ma)]

@@ -1,4 +1,5 @@
 import collections.abc
+from typing import Any, Iterator, List, Optional, Tuple, TypeVar, Union, Sequence, overload
 
 import varint
 
@@ -12,33 +13,65 @@ from .transforms import bytes_to_string
 __all__ = ("Multiaddr",)
 
 
-class MultiAddrKeys(collections.abc.KeysView, collections.abc.Sequence):
-    def __contains__(self, proto):
+T = TypeVar('T')
+
+
+class MultiAddrKeys(collections.abc.KeysView[Any], collections.abc.Sequence[Any]):
+    def __init__(self, mapping: 'Multiaddr') -> None:
+        self._mapping = mapping
+        super().__init__(mapping)
+
+    def __contains__(self, proto: object) -> bool:
         proto = self._mapping.registry.find(proto)
         return collections.abc.Sequence.__contains__(self, proto)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: Union[int, slice]) -> Union[Any, Sequence[Any]]:
+        if isinstance(idx, slice):
+            return list(self)[idx]
         if idx < 0:
             idx = len(self)+idx
         for idx2, proto in enumerate(self):
             if idx2 == idx:
                 return proto
-        raise IndexError("Protocol list index out of range")
+        raise IndexError(
+            "Protocol list index out of range"
+        )
 
-    __hash__ = collections.abc.KeysView._hash
+    def __hash__(self) -> int:
+        return hash(tuple(self))
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Any]:
         for _, proto, _, _ in bytes_iter(self._mapping.to_bytes()):
             yield proto
 
 
-class MultiAddrItems(collections.abc.ItemsView, collections.abc.Sequence):
-    def __contains__(self, item):
+class MultiAddrItems(
+    collections.abc.ItemsView[Any, Any],
+    collections.abc.Sequence[Tuple[Any, Any]]
+):
+    def __init__(self, mapping: 'Multiaddr') -> None:
+        self._mapping = mapping
+        super().__init__(mapping)
+
+    def __contains__(self, item: object) -> bool:
+        if not isinstance(item, tuple) or len(item) != 2:
+            return False
         proto, value = item
         proto = self._mapping.registry.find(proto)
         return collections.abc.Sequence.__contains__(self, (proto, value))
 
-    def __getitem__(self, idx):
+    @overload
+    def __getitem__(self, idx: int) -> Tuple[Any, Any]: ...
+
+    @overload
+    def __getitem__(self, idx: slice) -> Sequence[Tuple[Any, Any]]: ...
+
+    def __getitem__(
+        self,
+        idx: Union[int, slice]
+    ) -> Union[Tuple[Any, Any], Sequence[Tuple[Any, Any]]]:
+        if isinstance(idx, slice):
+            return list(self)[idx]
         if idx < 0:
             idx = len(self)+idx
         for idx2, item in enumerate(self):
@@ -46,7 +79,7 @@ class MultiAddrItems(collections.abc.ItemsView, collections.abc.Sequence):
                 return item
         raise IndexError("Protocol item list index out of range")
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Tuple[Any, Any]]:
         for _, proto, codec, part in bytes_iter(self._mapping.to_bytes()):
             if codec.SIZE != 0:
                 try:
@@ -65,23 +98,32 @@ class MultiAddrItems(collections.abc.ItemsView, collections.abc.Sequence):
                 yield proto, None
 
 
-class MultiAddrValues(collections.abc.ValuesView, collections.abc.Sequence):
-    __contains__ = collections.abc.Sequence.__contains__
+class MultiAddrValues(collections.abc.ValuesView[Any], collections.abc.Sequence[Any]):
+    def __init__(self, mapping: 'Multiaddr') -> None:
+        self._mapping = mapping
+        super().__init__(mapping)
 
-    def __getitem__(self, idx):
+    def __contains__(self, value: object) -> bool:
+        return collections.abc.Sequence.__contains__(self, value)
+
+    def __getitem__(self, idx: Union[int, slice]) -> Union[Any, Sequence[Any]]:
+        if isinstance(idx, slice):
+            return list(self)[idx]
         if idx < 0:
             idx = len(self)+idx
-        for idx2, proto in enumerate(self):
+        for idx2, value in enumerate(self):
             if idx2 == idx:
-                return proto
-        raise IndexError("Protocol value list index out of range")
+                return value
+        raise IndexError(
+            "Protocol value list index out of range"
+        )
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Any]:
         for _, value in MultiAddrItems(self._mapping):
             yield value
 
 
-class Multiaddr(collections.abc.Mapping):
+class Multiaddr(collections.abc.Mapping[Any, Any]):
     """Multiaddr is a representation of multiple nested internet addresses.
 
     Multiaddr is a cross-protocol, cross-platform format for representing
@@ -100,7 +142,12 @@ class Multiaddr(collections.abc.Mapping):
 
     __slots__ = ("_bytes", "registry")
 
-    def __init__(self, addr, *, registry=protocols.REGISTRY):
+    def __init__(
+        self,
+        addr: Union[str, bytes, 'Multiaddr'],
+        *,
+        registry: Any = protocols.REGISTRY
+    ) -> None:
         """Instantiate a new Multiaddr.
 
         Args:
@@ -118,48 +165,50 @@ class Multiaddr(collections.abc.Mapping):
             raise TypeError("MultiAddr must be bytes, str or another MultiAddr instance")
 
     @classmethod
-    def join(cls, *addrs):
+    def join(cls, *addrs: Union[str, bytes, 'Multiaddr']) -> 'Multiaddr':
         """Concatenate the values of the given MultiAddr strings or objects,
         encapsulating each successive MultiAddr value with the previous ones."""
         return cls(b"".join(map(lambda a: cls(a).to_bytes(), addrs)))
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         """Checks if two Multiaddr objects are exactly equal."""
+        if not isinstance(other, Multiaddr):
+            return NotImplemented
         return self._bytes == other._bytes
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Return the string representation of this Multiaddr.
 
         May raise a :class:`~multiaddr.exceptions.BinaryParseError` if the
         stored MultiAddr binary representation is invalid."""
         return bytes_to_string(self._bytes)
 
-    def __contains__(self, proto):
+    def __contains__(self, proto: object) -> bool:
         return proto in MultiAddrKeys(self)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Any]:
         return iter(MultiAddrKeys(self))
 
-    def __len__(self):
+    def __len__(self) -> int:
         return sum(1 for _ in bytes_iter(self.to_bytes()))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<Multiaddr %s>" % str(self)
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return self._bytes.__hash__()
 
-    def to_bytes(self):
+    def to_bytes(self) -> bytes:
         """Returns the byte array representation of this Multiaddr."""
         return self._bytes
 
     __bytes__ = to_bytes
 
-    def protocols(self):
+    def protocols(self) -> MultiAddrKeys:
         """Returns a list of Protocols this Multiaddr includes."""
         return MultiAddrKeys(self)
 
-    def split(self, maxsplit=-1):
+    def split(self, maxsplit: int = -1) -> List['Multiaddr']:
         """Returns the list of individual path components this MultiAddr is made
         up of."""
         final_split_offset = -1
@@ -179,26 +228,25 @@ class Multiaddr(collections.abc.Mapping):
         # Add final item with remainder of MultiAddr if there is anything left
         if final_split_offset >= 0:
             results.append(self.__class__(self._bytes[final_split_offset:]))
-
         return results
 
     keys = protocols
 
-    def items(self):
+    def items(self) -> MultiAddrItems:
         return MultiAddrItems(self)
 
-    def values(self):
+    def values(self) -> MultiAddrValues:
         return MultiAddrValues(self)
 
-    def encapsulate(self, other):
+    def encapsulate(self, other: Union[str, bytes, 'Multiaddr']) -> 'Multiaddr':
         """Wrap this Multiaddr around another.
 
         For example:
             /ip4/1.2.3.4 encapsulate /tcp/80 = /ip4/1.2.3.4/tcp/80
         """
-        return self.join(self, other)
+        return self.__class__.join(self, other)
 
-    def decapsulate(self, other):
+    def decapsulate(self, other: Union[str, bytes, 'Multiaddr']) -> 'Multiaddr':
         """Remove a Multiaddr wrapping.
 
         For example:
@@ -213,7 +261,7 @@ class Multiaddr(collections.abc.Mapping):
             return Multiaddr(self)
         return Multiaddr(s1[:idx])
 
-    def value_for_protocol(self, proto):
+    def value_for_protocol(self, proto: Any) -> Optional[Any]:
         """Return the value (if any) following the specified protocol
 
         Returns
@@ -233,6 +281,34 @@ class Multiaddr(collections.abc.Mapping):
         for proto2, value in self.items():
             if proto2 is proto or proto2 == proto:
                 return value
-        raise exceptions.ProtocolLookupError(proto, str(self))
+        raise exceptions.ProtocolLookupError(
+            proto, str(self)
+        )
 
-    __getitem__ = value_for_protocol
+    def __getitem__(self, proto: Any) -> Any:
+        """Returns the value for the given protocol.
+
+        Raises
+        ------
+        ~multiaddr.exceptions.ProtocolLookupError
+            If the protocol is not found in this Multiaddr.
+        ~multiaddr.exceptions.BinaryParseError
+            If the protocol value is invalid.
+        """
+        proto = self.registry.find(proto)
+        for _, p, codec, part in bytes_iter(self._bytes):
+            if p == proto:
+                if codec.SIZE == 0:
+                    return None
+                try:
+                    return codec.to_string(proto, part)
+                except Exception as exc:
+                    raise exceptions.BinaryParseError(
+                        str(exc),
+                        self._bytes,
+                        proto.name,
+                        exc,
+                    ) from exc
+        raise exceptions.ProtocolLookupError(
+            proto, str(self)
+        )

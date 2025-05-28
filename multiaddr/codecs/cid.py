@@ -1,16 +1,17 @@
 import base58
 import cid
+from typing import Dict, List
+from ..codecs import CodecBase
 
 from . import LENGTH_PREFIXED_VAR_SIZE
-
 
 SIZE = LENGTH_PREFIXED_VAR_SIZE
 IS_PATH = False
 
 
 # Spec: https://github.com/libp2p/specs/blob/master/peer-ids/peer-ids.md#string-representation
-CIDv0_PREFIX_TO_LENGTH = {
-    # base58btc prefixes for valid lengths 1 – 42 with the identity “hash” function
+CIDv0_PREFIX_TO_LENGTH: Dict[str, List[int]] = {
+    # base58btc prefixes for valid lengths 1 – 42 with the identity "hash" function
     '12': [5, 12, 19, 23, 30, 41, 52, 56],
     '13': [9, 16, 34, 45],
     '14': [27, 38, 49, 60],
@@ -62,34 +63,78 @@ CIDv0_PREFIX_TO_LENGTH = {
     'Qm': [46],
 }
 
-PROTO_NAME_TO_CIDv1_CODEC = {
-    # The “p2p” multiaddr protocol requires all keys to use the “libp2p-key” multicodec
+PROTO_NAME_TO_CIDv1_CODEC: Dict[str, str] = {
+    # The "p2p" multiaddr protocol requires all keys to use the "libp2p-key" multicodec
     "p2p": "libp2p-key",
 }
 
 
-def to_bytes(proto, string):
-    expected_codec = PROTO_NAME_TO_CIDv1_CODEC.get(proto.name)
+class Codec(CodecBase):
+    SIZE = SIZE
+    IS_PATH = IS_PATH
 
-    if len(string) in CIDv0_PREFIX_TO_LENGTH.get(string[0:2], ()):  # CIDv0
-        # Upgrade the wire (binary) representation of any received CIDv0 string
-        # to CIDv1 if we can determine which multicodec value to use
-        if expected_codec:
-            return cid.make_cid(1, expected_codec, base58.b58decode(string)).buffer
+    def to_bytes(self, proto, string):
+        expected_codec = PROTO_NAME_TO_CIDv1_CODEC.get(proto.name)
 
-        return base58.b58decode(string)
-    else:  # CIDv1+
-        parsed = cid.from_string(string)
+        if len(string) in CIDv0_PREFIX_TO_LENGTH.get(string[0:2], ()):  # CIDv0
+            # Upgrade the wire (binary) representation of any received CIDv0 string
+            # to CIDv1 if we can determine which multicodec value to use
+            if expected_codec:
+                cid_obj = cid.make_cid(1, expected_codec, base58.b58decode(string))
+                assert isinstance(cid_obj.buffer, bytes)
+                return cid_obj.buffer
 
-        # Ensure CID has correct codec for protocol
-        if expected_codec and parsed.codec != expected_codec:
-            raise ValueError("“{0}” multiaddr CIDs must use the “{1}” multicodec"
-                             .format(proto.name, expected_codec))
+            return base58.b58decode(string)
+        else:  # CIDv1+
+            parsed = cid.from_string(string)
 
-        return parsed.buffer
+            # Ensure CID has correct codec for protocol
+            if expected_codec and parsed.codec != expected_codec:
+                raise ValueError(
+                    '"{0}" multiaddr CIDs must use the "{1}" multicodec'.format(
+                        proto.name, expected_codec
+                    )
+                )
+
+            return parsed.buffer
+
+    def to_string(self, proto, buf):
+        expected_codec = PROTO_NAME_TO_CIDv1_CODEC.get(proto.name)
+
+        if _is_binary_cidv0_multihash(buf):  # CIDv0
+            if not expected_codec:
+                # Simply encode as base58btc as there is nothing better to do
+                return base58.b58encode(buf).decode('ascii')
+
+            # "Implementations SHOULD display peer IDs using the first (raw
+            #  base58btc encoded multihash) format until the second format is
+            #  widely supported."
+            #
+            # In the future the following line should instead convert the multihash
+            # to CIDv1 and with the `expected_codec` and wrap it in base32:
+            #   return cid.make_cid(1, expected_codec, buf).encode("base32").decode("ascii")
+            return base58.b58encode(buf).decode("ascii")
+        else:  # CIDv1+
+            parsed = cid.from_bytes(buf)
+
+            # Ensure CID has correct codec for protocol
+            if expected_codec and parsed.codec != expected_codec:
+                raise ValueError(
+                    '"{0}" multiaddr CIDs must use the "{1}" multicodec'.format(
+                        proto.name, expected_codec
+                    )
+                )
+
+            # "Implementations SHOULD display peer IDs using the first (raw
+            #  base58btc encoded multihash) format until the second format is
+            #  widely supported."
+            if expected_codec and _is_binary_cidv0_multihash(parsed.multihash):
+                return base58.b58encode(parsed.multihash).decode("ascii")
+
+            return parsed.encode("base32").decode("ascii")
 
 
-def _is_binary_cidv0_multihash(buf):
+def _is_binary_cidv0_multihash(buf: bytes) -> bool:
     if buf.startswith(b"\x12\x20") and len(buf) == 34:  # SHA2-256
         return True
 
@@ -97,36 +142,3 @@ def _is_binary_cidv0_multihash(buf):
         return True
 
     return False
-
-
-def to_string(proto, buf):
-    expected_codec = PROTO_NAME_TO_CIDv1_CODEC.get(proto.name)
-
-    if _is_binary_cidv0_multihash(buf):  # CIDv0
-        if not expected_codec:
-            # Simply encode as base58btc as there is nothing better to do
-            return base58.b58encode(buf).decode('ascii')
-
-        # “Implementations SHOULD display peer IDs using the first (raw
-        #  base58btc encoded multihash) format until the second format is
-        #  widely supported.”
-        #
-        # In the future the following line should instead convert the multihash
-        # to CIDv1 and with the `expected_codec` and wrap it in base32:
-        #   return cid.make_cid(1, expected_codec, buf).encode("base32").decode("ascii")
-        return base58.b58encode(buf).decode("ascii")
-    else:  # CIDv1+
-        parsed = cid.from_bytes(buf)
-
-        # Ensure CID has correct codec for protocol
-        if expected_codec and parsed.codec != expected_codec:
-            raise ValueError("“{0}” multiaddr CIDs must use the “{1}” multicodec"
-                             .format(proto.name, expected_codec))
-
-        # “Implementations SHOULD display peer IDs using the first (raw
-        #  base58btc encoded multihash) format until the second format is
-        #  widely supported.”
-        if expected_codec and _is_binary_cidv0_multihash(parsed.multihash):
-            return base58.b58encode(parsed.multihash).decode("ascii")
-
-        return parsed.encode("base32").decode("ascii")
