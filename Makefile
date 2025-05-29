@@ -51,11 +51,18 @@ setup:
 lint:
 	flake8 multiaddr/* tests/*
 
+fix:
+	python -m ruff check --fix .
+
+typecheck:
+	pre-commit run mypy-local --all-files && pre-commit run pyright-pretty --all-files
+
 test:
-	TOXENV=py27 tox
+	python -m pytest tests
 
 test-all:
-	tox
+	python3.11 -m pytest tests
+	python3.13 -m pytest tests
 
 coverage:
 	coverage run --source multiaddr setup.py test
