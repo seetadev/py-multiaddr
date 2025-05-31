@@ -1,6 +1,5 @@
 import importlib
-from typing import Dict, Union, Any
-
+from typing import Any, Dict, Union
 
 # These are special sizes
 LENGTH_PREFIXED_VAR_SIZE = -1
@@ -32,7 +31,7 @@ CODEC_CACHE: Dict[str, CodecBase] = {}
 
 
 def codec_by_name(name: Union[str, None]) -> CodecBase:
-    if name is None:  # Special "do nothing – expect nothing" pseudo-codec
+    if name is None:  # Special "do nothing - expect nothing" pseudo-codec
         return NoneCodec()
     codec = CODEC_CACHE.get(name)
     if codec is None:

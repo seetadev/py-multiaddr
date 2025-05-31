@@ -1,10 +1,11 @@
-import varint
 from typing import Any, Dict, List, Optional, Tuple, Union
+
+import varint
 
 from . import exceptions
 from .codecs import codec_by_name
 
-__all__ = ("Protocol", "PROTOCOLS", "REGISTRY")
+__all__ = ("PROTOCOLS", "REGISTRY", "Protocol")
 
 
 # source of protocols https://github.com/multiformats/multicodec/blob/master/table.csv#L382
@@ -45,8 +46,8 @@ P_UNIX = 0x0190
 class Protocol:
     __slots__ = [
         "code",   # int
-        "name",   # string
         "codec",  # string
+        "name",   # string
     ]
 
     def __init__(self, code: int, name: str, codec: Optional[str]) -> None:

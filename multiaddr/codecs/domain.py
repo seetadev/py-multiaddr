@@ -3,7 +3,6 @@ import idna
 from ..codecs import CodecBase
 from ..exceptions import BinaryParseError
 
-
 SIZE = -1
 IS_PATH = False
 

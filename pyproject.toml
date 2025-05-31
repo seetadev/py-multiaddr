@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "multiaddr"
+version = "0.0.9"
+description = "Python implementation of jbenet's multiaddr"
+readme = "README.rst"
+authors = [{ name = "Steven Buss", email = "steven.buss@gmail.com" }]
+license = { text = "MIT License" }
+keywords = ["multiaddr"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+requires-python = ">=3.9, <4.0"
+dependencies = [
+    "varint",
+    "base58",
+    "netaddr",
+    "idna",
+    "py-cid",
+    "py-multicodec >= 0.2.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/multiformats/py-multiaddr"
+Download = "https://github.com/multiformats/py-multiaddr/tarball/0.0.9"
+
+[project.optional-dependencies]
+dev = [
+    "bumpversion==0.5.3",
+    "wheel>=0.31.0",
+    "watchdog>=3.0.0",
+    "tox==3.6.1",
+    "coverage==4.5.2",
+    "Sphinx==1.3.6",
+    "pytest",
+    "pytest-cov",
+    "pytest-runner",
+    "ruff",
+    "pyright",
+    "pre-commit",
+]
+test = ["pytest"]
+
+[tool.setuptools]
+packages = ["multiaddr"]
+include-package-data = true
+zip-safe = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
