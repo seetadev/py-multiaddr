@@ -1,5 +1,3 @@
-**This project is no longer maintained and has been archived.**
-
 py-multiaddr
 ==========================
 
@@ -99,6 +97,8 @@ Multiaddr allows expressing tunnels very nicely.
 
 Maintainers
 ===========
+
+Request for maintainership by @seetadev, @acu71, @arcinston
 
 Original author: `@sbuss`_.
 
