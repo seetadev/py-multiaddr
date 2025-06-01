@@ -1,8 +1,8 @@
 import base64
-from ..codecs import CodecBase
-from ..exceptions import BinaryParseError
 import binascii
 
+from ..codecs import CodecBase
+from ..exceptions import BinaryParseError
 
 SIZE = 96
 IS_PATH = False
@@ -48,6 +48,6 @@ class Codec(CodecBase):
             port = str(int.from_bytes(buf[10:12], byteorder='big'))
             if not 1 <= int(port) <= 65535:
                 raise ValueError("Invalid onion port range")
-            return f"{addr}:{port}"  # noqa: E231
+            return f"{addr}:{port}"
         except (ValueError, UnicodeDecodeError, binascii.Error) as e:
             raise BinaryParseError(str(e), buf, proto)

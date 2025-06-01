@@ -1,21 +1,24 @@
 import pytest
 
-from multiaddr.exceptions import BinaryParseError
-from multiaddr.exceptions import ProtocolLookupError
-from multiaddr.exceptions import ProtocolNotFoundError
-from multiaddr.exceptions import StringParseError
-
+from multiaddr.exceptions import (
+    BinaryParseError,
+    ProtocolLookupError,
+    ProtocolNotFoundError,
+    StringParseError,
+)
 from multiaddr.multiaddr import Multiaddr
-from multiaddr.protocols import protocol_with_name
-from multiaddr.protocols import protocols_with_string
-from multiaddr.protocols import P_DNS
-from multiaddr.protocols import P_IP4
-from multiaddr.protocols import P_IP6
-from multiaddr.protocols import P_P2P
-from multiaddr.protocols import P_UTP
-from multiaddr.protocols import P_TCP
-from multiaddr.protocols import P_UDP
-from multiaddr.protocols import P_UNIX
+from multiaddr.protocols import (
+    P_DNS,
+    P_IP4,
+    P_IP6,
+    P_P2P,
+    P_TCP,
+    P_UDP,
+    P_UNIX,
+    P_UTP,
+    protocol_with_name,
+    protocols_with_string,
+)
 
 
 @pytest.mark.parametrize(

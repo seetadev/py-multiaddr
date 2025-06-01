@@ -1,6 +1,5 @@
 from ..codecs import CodecBase
 
-
 SIZE = -1
 IS_PATH = True
 

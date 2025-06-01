@@ -1,6 +1,6 @@
 import netaddr
-from ..codecs import CodecBase
 
+from ..codecs import CodecBase
 
 SIZE = 32
 IS_PATH = False

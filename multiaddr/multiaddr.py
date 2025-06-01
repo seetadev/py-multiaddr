@@ -1,15 +1,11 @@
 # flake8: noqa: F811
 import collections.abc
-from typing import Any, Iterator, List, Optional, Tuple, TypeVar, Union, Sequence, overload
+from typing import Any, Iterator, List, Optional, Sequence, Tuple, TypeVar, Union, overload
 
 import varint
 
 from . import exceptions, protocols
-
-from .transforms import bytes_iter
-from .transforms import string_to_bytes
-from .transforms import bytes_to_string
-
+from .transforms import bytes_iter, bytes_to_string, string_to_bytes
 
 __all__ = ("Multiaddr",)
 
@@ -49,7 +45,7 @@ class MultiAddrKeys(collections.abc.KeysView[Any], collections.abc.Sequence[Any]
 class MultiAddrItems(
     collections.abc.ItemsView[Any, Any],
     collections.abc.Sequence[Tuple[Any, Any]]
-):  # noqa: F811
+):
     def __init__(self, mapping: 'Multiaddr') -> None:
         self._mapping = mapping
         super().__init__(mapping)
@@ -67,7 +63,7 @@ class MultiAddrItems(
     @overload
     def __getitem__(self, idx: slice) -> Sequence[Tuple[Any, Any]]: ...
 
-    def __getitem__(  # noqa: F811
+    def __getitem__(
         self,
         idx: Union[int, slice]
     ) -> Union[Tuple[Any, Any], Sequence[Tuple[Any, Any]]]:

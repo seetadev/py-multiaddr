@@ -1,18 +1,12 @@
 import io
-from typing import Generator, List, Optional, Tuple
 from io import BytesIO
+from typing import Generator, List, Optional, Tuple
 
 import varint
 
 from . import exceptions
-
-from .codecs import LENGTH_PREFIXED_VAR_SIZE
-from .codecs import codec_by_name
-from .codecs import CodecBase
-
-from .protocols import protocol_with_code
-from .protocols import protocol_with_name
-from .protocols import Protocol
+from .codecs import LENGTH_PREFIXED_VAR_SIZE, CodecBase, codec_by_name
+from .protocols import Protocol, protocol_with_code, protocol_with_name
 
 
 def string_to_bytes(string: str) -> bytes:
