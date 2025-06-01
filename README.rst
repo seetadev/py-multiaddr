@@ -98,7 +98,7 @@ Multiaddr allows expressing tunnels very nicely.
 Maintainers
 ===========
 
-Request for maintainership by @dhuseby, @pacrob, @seetadev, @acu71, @arcinston
+Request for maintainership by Py-libp2p team (please visit https://pypi.org/project/libp2p/ and https://github.com/libp2p/py-libp2p/)
 
 
 Original author: `@sbuss`_.
