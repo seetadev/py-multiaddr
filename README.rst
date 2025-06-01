@@ -98,7 +98,8 @@ Multiaddr allows expressing tunnels very nicely.
 Maintainers
 ===========
 
-Request for maintainership by @seetadev, @acu71, @arcinston
+Request for maintainership by @dhuseby, @pacrob, @seetadev, @acu71, @arcinston
+
 
 Original author: `@sbuss`_.
 
