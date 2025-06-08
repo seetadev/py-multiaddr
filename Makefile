@@ -16,7 +16,7 @@ help:
 	@echo "clean-build - remove build artifacts"
 	@echo "clean-pyc - remove Python file artifacts"
 	@echo "clean-test - remove test and coverage artifacts"
-	@echo "lint - check style with flake8"
+	@echo "lint - check style with ruff"
 	@echo "test - run tests quickly with the default Python"
 	@echo "test-all - run tests on every Python version with tox"
 	@echo "coverage - check code coverage quickly with the default Python"
@@ -49,13 +49,20 @@ setup:
 	pip install -r requirements_dev.txt
 
 lint:
-	flake8 multiaddr/* tests/*
+	python -m ruff check --fix
+
+fix:
+	python -m ruff check --fix
+
+typecheck:
+	pre-commit run pyright-pretty --all-files
 
 test:
-	TOXENV=py27 tox
+	python -m pytest tests
 
 test-all:
-	tox
+	python3.11 -m pytest tests
+	python3.13 -m pytest tests
 
 coverage:
 	coverage run --source multiaddr setup.py test

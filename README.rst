@@ -40,7 +40,8 @@ Simple
     m1 = Multiaddr("/ip4/127.0.0.1/udp/1234")
 
     # construct from bytes
-    m2 = Multiaddr(bytes_addr=m1.to_bytes())
+    #m2 = Multiaddr(bytes_addr=m1.to_bytes()) # deprecated
+    m2 = Multiaddr(m1.to_bytes())
 
     assert str(m1) == "/ip4/127.0.0.1/udp/1234"
     assert str(m1) == str(m2)

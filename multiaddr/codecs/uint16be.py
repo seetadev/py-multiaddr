@@ -1,20 +1,23 @@
-import struct
-
+from ..codecs import CodecBase
 
 SIZE = 16
 IS_PATH = False
 
 
-def to_bytes(proto, string):
-    try:
-        return struct.pack('>H', int(string, 10))
-    except ValueError as exc:
-        raise ValueError("Not a base 10 integer") from exc
-    except struct.error as exc:
-        raise ValueError("Integer not in range(65536)") from exc
+class Codec(CodecBase):
+    SIZE = SIZE
+    IS_PATH = IS_PATH
 
+    def to_bytes(self, proto, string):
+        try:
+            n = int(string, 10)
+        except ValueError:
+            raise ValueError("invalid base 10 integer")
+        if n < 0 or n >= 65536:
+            raise ValueError("integer not in range [0, 65536)")
+        return n.to_bytes(2, byteorder='big')
 
-def to_string(proto, buf):
-    if len(buf) != 2:
-        raise ValueError("Invalid integer length (must be 2 bytes / 16 bits)")
-    return str(struct.unpack('>H', buf)[0])
+    def to_string(self, proto, buf):
+        if len(buf) != 2:
+            raise ValueError("buffer length must be 2 bytes")
+        return str(int.from_bytes(buf, byteorder='big'))
