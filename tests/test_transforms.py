@@ -5,7 +5,7 @@ import io
 import pytest
 
 import multiaddr.protocols
-from multiaddr.codecs import codec_by_name
+from multiaddr.codecs import CODEC_CACHE, CodecBase, codec_by_name
 from multiaddr.exceptions import BinaryParseError, StringParseError
 from multiaddr.multiaddr import Multiaddr
 from multiaddr.protocols import REGISTRY, Protocol
@@ -147,8 +147,21 @@ class DummyProtocol(Protocol):
 class UnparsableProtocol(DummyProtocol):
     def __init__(self):
         super().__init__(
-            333, "unparsable", "nonexistent"
-        )  # Use a non-existent codec name that will cause BinaryParseError
+            333, "unparsable", "unparsable_codec"
+        )  # Use a custom codec that will cause BinaryParseError
+
+
+# Add a custom codec for UnparsableProtocol
+class UnparsableCodec(CodecBase):
+    def to_bytes(self, proto, string):
+        raise BinaryParseError("Invalid bytes for unparsable protocol", b"", "unparsable")
+
+    def to_string(self, proto, buf):
+        raise BinaryParseError("Invalid bytes for unparsable protocol", buf, "unparsable")
+
+
+# Register the custom codec
+CODEC_CACHE["unparsable_codec"] = UnparsableCodec()
 
 
 @pytest.fixture
