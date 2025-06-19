@@ -1,7 +1,10 @@
-import os
+import logging
 import urllib.parse
-from . import CodecBase, LENGTH_PREFIXED_VAR_SIZE
+
 from ..exceptions import BinaryParseError
+from . import LENGTH_PREFIXED_VAR_SIZE, CodecBase
+
+logger = logging.getLogger(__name__)
 
 SIZE = LENGTH_PREFIXED_VAR_SIZE
 IS_PATH = True
@@ -11,47 +14,59 @@ class Codec(CodecBase):
     SIZE = SIZE
     IS_PATH = IS_PATH
 
-    def to_bytes(self, proto, value: str) -> bytes:
+    def to_bytes(self, proto, string: str) -> bytes:
         """Convert a filesystem path to its binary representation."""
-        if not value:
+        logger.debug(f"[DEBUG fspath.to_bytes] input value: {string}")
+        if not string:
             raise ValueError("Path cannot be empty")
 
         # Normalize path separators
-        value = value.replace("\\", "/")
-        
-        # Remove leading/trailing slashes
-        value = value.strip("/")
-        
+        string = string.replace("\\", "/")
+
+        # Remove leading/trailing slashes but preserve path components
+        string = string.strip("/")
+
         # Handle empty path after normalization
-        if not value:
+        if not string:
             raise ValueError("Path cannot be empty after normalization")
-            
+
         # URL decode to handle special characters
-        value = urllib.parse.unquote(value)
-        
+        string = urllib.parse.unquote(string)
+
         # Encode as UTF-8
-        return value.encode("utf-8")
+        encoded = string.encode("utf-8")
+        logger.debug(f"[DEBUG fspath.to_bytes] encoded bytes: {encoded}")
+        return encoded
 
     def to_string(self, proto, buf: bytes) -> str:
         """Convert a binary filesystem path to its string representation."""
+        logger.debug(f"[DEBUG fspath.to_string] input bytes: {buf}")
         if not buf:
             raise ValueError("Path buffer cannot be empty")
 
         try:
             # Decode from UTF-8
             value = buf.decode("utf-8")
-            
+            logger.debug(f"[DEBUG fspath.to_string] decoded value: {value}")
+
             # Normalize path separators
             value = value.replace("\\", "/")
-            
-            # Remove leading/trailing slashes
+
+            # Remove leading/trailing slashes but preserve path components
             value = value.strip("/")
-            
+
             # Handle empty path after normalization
             if not value:
                 raise ValueError("Path cannot be empty after normalization")
-                
+
             # URL encode special characters
-            return urllib.parse.quote(value)
+            result = urllib.parse.quote(value)
+            logger.debug(f"[DEBUG fspath.to_string] output string: {result}")
+
+            # Add leading slash for Unix socket paths
+            if proto.name == "unix":
+                result = "/" + result
+
+            return result
         except UnicodeDecodeError as e:
-            raise BinaryParseError(f"Invalid UTF-8 encoding: {str(e)}", buf, proto.name, e)
+            raise BinaryParseError(f"Invalid UTF-8 encoding: {e!s}", buf, proto.name, e)

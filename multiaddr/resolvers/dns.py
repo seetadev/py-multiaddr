@@ -1,35 +1,40 @@
 """DNS resolver implementation for multiaddr."""
 
-import socket
 import re
-from typing import List, Optional, Dict, Any
+from typing import Optional, cast
 
-import trio
 import base58
+import dns.asyncresolver
+import dns.rdataclass
+import dns.rdtypes.IN.A
+import dns.rdtypes.IN.AAAA
+import dns.resolver
+import trio
 
-from ..exceptions import ResolutionError, RecursionLimitError
+from ..exceptions import RecursionLimitError, ResolutionError
 from ..multiaddr import Multiaddr
-from ..protocols import P_DNS, P_DNS4, P_DNS6, P_DNSADDR
-from . import Resolver
+from ..protocols import P_DNS, P_DNS4, P_DNS6, P_DNSADDR, Protocol
+from .base import Resolver
 
 
 class DNSResolver(Resolver):
     """DNS resolver for multiaddr."""
 
     MAX_RECURSIVE_DEPTH = 32
+    DEFAULT_TIMEOUT = 5.0  # 5 seconds timeout
 
     def __init__(self):
         """Initialize the DNS resolver."""
-        pass
+        self._resolver = dns.asyncresolver.Resolver()
 
-    async def resolve(self, ma: 'Multiaddr', options: Optional[Dict[str, Any]] = None) -> List['Multiaddr']:
+    async def resolve(
+        self, maddr: "Multiaddr", options: Optional[dict] = None
+    ) -> list["Multiaddr"]:
         """Resolve a DNS multiaddr to its actual addresses.
 
         Args:
-            ma: The multiaddr to resolve
-            options: Optional configuration for resolution
-                - max_recursive_depth: Maximum depth for recursive resolution (default: 32)
-                - signal: Optional signal for cancellation
+            maddr: The multiaddr to resolve
+            options: Optional configuration options
 
         Returns:
             A list of resolved multiaddrs
@@ -39,41 +44,44 @@ class DNSResolver(Resolver):
             RecursionLimitError: If maximum recursive depth is reached
             trio.Cancelled: If the operation is cancelled
         """
-        if not options:
-            options = {}
-
-        # Check for cancellation
-        signal = options.get("signal")
-        if signal and signal.aborted:
-            return []
-
-        # Get the first protocol
-        protocols = ma.protocols()
+        protocols: list[Protocol] = list(maddr.protocols())
         if not protocols:
             raise ResolutionError("empty multiaddr")
 
         first_protocol = protocols[0]
         if first_protocol.code not in (P_DNS, P_DNS4, P_DNS6, P_DNSADDR):
-            return [ma]
+            return [maddr]
 
         # Get the hostname and clean it of quotes
-        hostname = ma.value_for_protocol(first_protocol.code)
+        hostname = maddr.value_for_protocol(first_protocol.code)
         if not hostname:
-            return [ma]
+            return [maddr]
 
         # Remove quotes from hostname
         hostname = self._clean_quotes(hostname)
 
-        # Check for cancellation again
-        if signal and signal.aborted:
-            return []
+        # Get max recursive depth from options or use default
+        max_depth = (
+            options.get("max_recursive_depth", self.MAX_RECURSIVE_DEPTH)
+            if options else self.MAX_RECURSIVE_DEPTH
+        )
+
+        # Get signal from options if provided
+        signal = options.get("signal") if options else None
 
         try:
             if first_protocol.code == P_DNSADDR:
-                return await self._resolve_dnsaddr(hostname, ma, options.get("max_recursive_depth", self.MAX_RECURSIVE_DEPTH), options)
+                resolved = await self._resolve_dnsaddr(
+                    hostname,
+                    maddr,
+                    max_depth,
+                    signal,
+                )
+                return resolved if resolved else [maddr]
             else:
-                return await self._resolve_dns(hostname, first_protocol.code, options)
-        except RecursionLimitError as e:
+                resolved = await self._resolve_dns(hostname, first_protocol.code, signal)
+                return resolved if resolved else [maddr]
+        except RecursionLimitError:
             # Do not wrap RecursionLimitError so tests can catch it
             raise
         except Exception as e:
@@ -89,17 +97,22 @@ class DNSResolver(Resolver):
             The cleaned text without quotes
         """
         # Remove all types of quotes (single, double, mixed)
-        return re.sub(r'[\'"\s]+', '', text)
+        return re.sub(r'[\'"\s]+', "", text)
 
-    async def _resolve_dnsaddr(self, hostname: str, original_ma: 'Multiaddr', 
-                             max_depth: int, options: Dict[str, Any]) -> List['Multiaddr']:
+    async def _resolve_dnsaddr(
+        self,
+        hostname: str,
+        original_ma: "Multiaddr",
+        max_depth: int,
+        signal: Optional[trio.CancelScope] = None,
+    ) -> list["Multiaddr"]:
         """Resolve a DNSADDR record.
 
         Args:
             hostname: The hostname to resolve
             original_ma: The original multiaddr being resolved
             max_depth: Maximum depth for recursive resolution
-            options: Resolution options
+            signal: Optional signal for cancellation
 
         Returns:
             A list of resolved multiaddrs
@@ -112,11 +125,6 @@ class DNSResolver(Resolver):
         if max_depth <= 0:
             raise RecursionLimitError(f"Maximum recursive depth exceeded for {hostname}")
 
-        # Check for cancellation
-        signal = options.get("signal")
-        if signal and signal.aborted:
-            return []
-
         # Get the peer ID if present
         peer_id = None
         try:
@@ -125,78 +133,94 @@ class DNSResolver(Resolver):
             # If there's no peer ID, that's fine - we'll just resolve the address
             pass
 
-        # Resolve the hostname
+        # Resolve the hostname with timeout and cancellation support
         try:
-            addrinfo = await trio.to_thread.run_sync(
-                socket.getaddrinfo,
-                hostname,
-                None,
-                socket.AF_UNSPEC,
-                socket.SOCK_STREAM,
-            )
-        except socket.gaierror as e:
-            # Check for cancellation before raising error
-            signal = options.get("signal")
-            if signal and signal.aborted:
-                return []
-            raise ResolutionError(f"Failed to resolve DNSADDR {hostname}: {e!s}")
-        except Exception as e:
-            # Check for cancellation before raising error
-            signal = options.get("signal")
-            if signal and signal.aborted:
-                return []
-            raise ResolutionError(f"Failed to resolve DNSADDR {hostname}: {e!s}")
-
-        # Check for cancellation immediately after DNS resolution
-        signal = options.get("signal")
-        if signal and signal.aborted:
-            return []
-
-        # Process the results
-        results = []
-        for family, _, _, _, sockaddr in addrinfo:
-            if family == socket.AF_INET:
-                ip = sockaddr[0]
-                ma = Multiaddr(f"/ip4/{ip}")
-            elif family == socket.AF_INET6:
-                ip = sockaddr[0]
-                ma = Multiaddr(f"/ip6/{ip}")
+            if signal:
+                # Use the provided signal for cancellation
+                with signal:
+                    results = []
+                    # Try both A and AAAA records
+                    for record_type, fam in [("A", "ip4"), ("AAAA", "ip6")]:
+                        try:
+                            answer = await self._resolver.resolve(hostname, record_type)
+                            for rdata in answer:
+                                # Cast to the specific DNS record type to access address
+                                if record_type == "A":
+                                    address = str(cast(dns.rdtypes.IN.A.A, rdata).address)
+                                else:  # AAAA
+                                    address = str(cast(dns.rdtypes.IN.AAAA.AAAA, rdata).address)
+                                ma = Multiaddr(f"/{fam}/{address}")
+                                def is_valid_peer_id(peer_id):
+                                    try:
+                                        decoded = base58.b58decode(peer_id)
+                                        if len(decoded) in (34, 36, 38, 42, 46):
+                                            return True
+                                    except Exception:
+                                        pass
+                                    if peer_id.startswith(("b", "z")) and len(peer_id) > 40:
+                                        return True
+                                    return False
+                                if peer_id and is_valid_peer_id(peer_id):
+                                    try:
+                                        ma = ma.encapsulate(f"/p2p/{peer_id}")
+                                        return [ma]
+                                    except Exception:
+                                        continue
+                                results.append(ma)
+                        except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
+                            continue
+                    return results
             else:
-                continue
+                # Use default timeout-based cancellation
+                with trio.CancelScope() as cancel_scope:  # type: ignore[call-arg]
+                    # Set a timeout for DNS resolution
+                    cancel_scope.deadline = trio.current_time() + self.DEFAULT_TIMEOUT
+                    cancel_scope.cancelled_caught = True
 
-            # Helper to validate peer ID (CIDv0 base58btc or CIDv1)
-            def is_valid_peer_id(peer_id):
-                try:
-                    # Try base58 decode (CIDv0)
-                    decoded = base58.b58decode(peer_id)
-                    if len(decoded) in (34, 36, 38, 42, 46):  # common multihash lengths
-                        return True
-                except Exception:
-                    pass
-                # Try CIDv1 (should start with 'b' or 'z' and be base32)
-                if peer_id.startswith(('b', 'z')) and len(peer_id) > 40:
-                    return True
-                return False
+                    results = []
+                    # Try both A and AAAA records
+                    for record_type, fam in [("A", "ip4"), ("AAAA", "ip6")]:
+                        try:
+                            answer = await self._resolver.resolve(hostname, record_type)
+                            for rdata in answer:
+                                # Cast to the specific DNS record type to access address
+                                if record_type == "A":
+                                    address = str(cast(dns.rdtypes.IN.A.A, rdata).address)
+                                else:  # AAAA
+                                    address = str(cast(dns.rdtypes.IN.AAAA.AAAA, rdata).address)
+                                ma = Multiaddr(f"/{fam}/{address}")
+                                def is_valid_peer_id(peer_id):
+                                    try:
+                                        decoded = base58.b58decode(peer_id)
+                                        if len(decoded) in (34, 36, 38, 42, 46):
+                                            return True
+                                    except Exception:
+                                        pass
+                                    if peer_id.startswith(("b", "z")) and len(peer_id) > 40:
+                                        return True
+                                    return False
+                                if peer_id and is_valid_peer_id(peer_id):
+                                    try:
+                                        ma = ma.encapsulate(f"/p2p/{peer_id}")
+                                        return [ma]
+                                    except Exception:
+                                        continue
+                                results.append(ma)
+                        except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
+                            continue
+                    return results
+        except Exception as e:
+            raise ResolutionError(f"Failed to resolve DNSADDR {hostname}: {e!s}")
 
-            # Only encapsulate /p2p/peer_id if peer_id is present, valid, and not already in the multiaddr
-            if peer_id and is_valid_peer_id(peer_id) and not any(p.name == "p2p" for p in ma.protocols()):
-                try:
-                    ma = ma.encapsulate(f"/p2p/{peer_id}")
-                except Exception:
-                    # If encapsulation fails, skip this result
-                    continue
-
-            results.append(ma)
-
-        return results
-
-    async def _resolve_dns(self, hostname: str, protocol_code: int, options: Dict[str, Any]) -> List['Multiaddr']:
+    async def _resolve_dns(
+        self, hostname: str, protocol_code: int, signal: Optional[trio.CancelScope] = None
+    ) -> list["Multiaddr"]:
         """Resolve a DNS record.
 
         Args:
             hostname: The hostname to resolve
             protocol_code: The protocol code (DNS, DNS4, or DNS6)
-            options: Resolution options
+            signal: Optional signal for cancellation
 
         Returns:
             A list of resolved multiaddrs
@@ -205,63 +229,50 @@ class DNSResolver(Resolver):
             ResolutionError: If resolution fails
             trio.Cancelled: If the operation is cancelled
         """
-        # Check for cancellation
-        signal = options.get("signal")
-        if signal and signal.aborted:
-            return []
-
-        # Determine the address family
-        if protocol_code == P_DNS4:
-            family = socket.AF_INET
-        elif protocol_code == P_DNS6:
-            family = socket.AF_INET6
-        else:  # P_DNS
-            family = socket.AF_UNSPEC  # Both IPv4 and IPv6
-
-        # Resolve the hostname
         try:
-            addrinfo = await trio.to_thread.run_sync(
-                socket.getaddrinfo,
-                hostname,
-                None,
-                family,
-                socket.SOCK_STREAM,
-            )
-        except socket.gaierror as e:
-            # Check for cancellation before raising error
-            signal = options.get("signal")
-            if signal and signal.aborted:
-                return []
-            raise ResolutionError(f"Failed to resolve DNS {hostname}: {e!s}")
-        except Exception as e:
-            # Check for cancellation before raising error
-            signal = options.get("signal")
-            if signal and signal.aborted:
-                return []
-            raise ResolutionError(f"Failed to resolve DNS {hostname}: {e!s}")
-
-        # Check for cancellation again
-        if signal and signal.aborted:
-            return []
-
-        # Process the results
-        results = []
-        for family, _, _, _, sockaddr in addrinfo:
-            if family == socket.AF_INET:
-                ip = sockaddr[0]
-                results.append(Multiaddr(f"/ip4/{ip}"))
-            elif family == socket.AF_INET6:
-                ip = sockaddr[0]
-                results.append(Multiaddr(f"/ip6/{ip}"))
+            if signal:
+                # Use the provided signal for cancellation
+                with signal:
+                    results = []
+                    if protocol_code in (P_DNS, P_DNS4):
+                        try:
+                            answer = await self._resolver.resolve(hostname, "A")
+                            for rdata in answer:
+                                address = str(cast(dns.rdtypes.IN.A.A, rdata).address)
+                                results.append(Multiaddr(f"/ip4/{address}"))
+                        except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
+                            pass
+                    if protocol_code in (P_DNS, P_DNS6):
+                        try:
+                            answer = await self._resolver.resolve(hostname, "AAAA")
+                            for rdata in answer:
+                                address = str(cast(dns.rdtypes.IN.AAAA.AAAA, rdata).address)
+                                results.append(Multiaddr(f"/ip6/{address}"))
+                        except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
+                            pass
+                    return results
             else:
-                continue
-
-        # Check for cancellation after DNS resolution
-        signal = options.get("signal")
-        if signal and signal.aborted:
-            return []
-
-        return results
+                # No signal provided, proceed without cancellation
+                results = []
+                if protocol_code in (P_DNS, P_DNS4):
+                    try:
+                        answer = await self._resolver.resolve(hostname, "A")
+                        for rdata in answer:
+                            address = str(cast(dns.rdtypes.IN.A.A, rdata).address)
+                            results.append(Multiaddr(f"/ip4/{address}"))
+                    except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
+                        pass
+                if protocol_code in (P_DNS, P_DNS6):
+                    try:
+                        answer = await self._resolver.resolve(hostname, "AAAA")
+                        for rdata in answer:
+                            address = str(cast(dns.rdtypes.IN.AAAA.AAAA, rdata).address)
+                            results.append(Multiaddr(f"/ip6/{address}"))
+                    except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
+                        pass
+                return results
+        except Exception as e:
+            raise ResolutionError(f"Failed to resolve DNS {hostname}: {e!s}")
 
 
 __all__ = ["DNSResolver"]

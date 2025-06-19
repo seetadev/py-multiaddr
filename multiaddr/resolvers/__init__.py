@@ -1,7 +1,11 @@
 """DNS resolution support for multiaddr."""
 
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 from typing import Protocol as TypeProtocol
+
+from .dns import DNSResolver
+
+__all__ = ["DNSResolver", "Resolver"]
 
 if TYPE_CHECKING:
     from ..multiaddr import Multiaddr
@@ -10,7 +14,7 @@ if TYPE_CHECKING:
 class Resolver(TypeProtocol):
     """Base protocol for multiaddr resolvers."""
 
-    async def resolve(self, ma: 'Multiaddr') -> List['Multiaddr']:
+    async def resolve(self, ma: "Multiaddr") -> list["Multiaddr"]:
         """Resolve a multiaddr that contains a resolvable protocol.
 
         Args:
@@ -20,8 +24,3 @@ class Resolver(TypeProtocol):
             A list of resolved multiaddrs
         """
         ...
-
-
-from .dns import DNSResolver
-
-__all__ = ["Resolver", "DNSResolver"]
