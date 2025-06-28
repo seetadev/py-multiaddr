@@ -185,4 +185,8 @@ async def test_resolve_cancellation_with_error():
             await trio.sleep(0.1)
             signal.cancel()
 
-            # The nursery should handle the cancellation
+            # The nursery should handle the cancellation gracefully
+            # If cancellation is not handled properly, this would raise an unhandled exception
+
+        # Verify that the signal was actually cancelled
+        assert signal.cancel_called
