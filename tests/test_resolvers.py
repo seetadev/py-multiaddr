@@ -139,11 +139,27 @@ async def test_resolve_dns_addr_with_mixed_quotes(dns_resolver, mock_dns_resolut
     with patch.object(dns_resolver._resolver, "resolve") as mock_resolve:
         mock_resolve.side_effect = mock_dns_resolution["mock_resolve_side_effect"]
 
-        ma = Multiaddr("/dnsaddr/example.com")
-        result = await dns_resolver.resolve(ma)
-        assert len(result) == 1
-        assert result[0].protocols()[0].name == "ip4"
-        assert result[0].value_for_protocol(result[0].protocols()[0].code) == "127.0.0.1"
+        # Test that _clean_quotes is called correctly during resolution
+        with patch.object(dns_resolver, "_clean_quotes") as mock_clean_quotes:
+            mock_clean_quotes.return_value = "example.com"
+
+            ma = Multiaddr("/dnsaddr/example.com")
+            result = await dns_resolver.resolve(ma)
+
+            # Verify _clean_quotes was called with the hostname
+            mock_clean_quotes.assert_called_once_with("example.com")
+
+            # Verify the resolution still works correctly
+            assert len(result) == 1
+            assert result[0].protocols()[0].name == "ip4"
+            assert result[0].value_for_protocol(result[0].protocols()[0].code) == "127.0.0.1"
+
+        # Test the actual _clean_quotes functionality
+        assert dns_resolver._clean_quotes('"example.com"') == "example.com"
+        assert dns_resolver._clean_quotes("'example.com'") == "example.com"
+        assert dns_resolver._clean_quotes('" example.com "') == "example.com"
+        assert dns_resolver._clean_quotes("  example.com  ") == "example.com"
+        assert dns_resolver._clean_quotes('"example.com"') == "example.com"
 
 
 @pytest.mark.trio
