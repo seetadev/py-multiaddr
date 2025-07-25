@@ -11,20 +11,6 @@ endef
 export BROWSER_PYSCRIPT
 BROWSER := python -c "$$BROWSER_PYSCRIPT"
 
-help:
-	@echo "clean - remove all build, test, coverage and Python artifacts"
-	@echo "clean-build - remove build artifacts"
-	@echo "clean-pyc - remove Python file artifacts"
-	@echo "clean-test - remove test and coverage artifacts"
-	@echo "lint - check style with flake8"
-	@echo "test - run tests quickly with the default Python"
-	@echo "test-all - run tests on every Python version with tox"
-	@echo "coverage - check code coverage quickly with the default Python"
-	@echo "docs - generate Sphinx HTML documentation, including API docs"
-	@echo "release - package and upload a release"
-	@echo "dist - package"
-	@echo "install - install the package to the active Python's site-packages"
-
 clean: clean-build clean-pyc clean-test
 
 clean-build:
@@ -49,13 +35,20 @@ setup:
 	pip install -r requirements_dev.txt
 
 lint:
-	flake8 multiaddr/* tests/*
+	python -m ruff check --fix
+
+fix:
+	python -m ruff check --fix
+
+typecheck:
+	pre-commit run pyright-pretty --all-files
 
 test:
-	TOXENV=py27 tox
+	python -m pytest tests
 
 test-all:
-	tox
+	python3.11 -m pytest tests
+	python3.13 -m pytest tests
 
 coverage:
 	coverage run --source multiaddr setup.py test
@@ -74,24 +67,41 @@ docs:
 servedocs: docs
 	watchmedo shell-command -p '*.rst' -c '$(MAKE) -C docs html' -R -D .
 
-readme.html: README.rst
-	rst2html.py README.rst > readme.html
-
 .PHONY: authors
 authors:
 	git shortlog --numbered --summary --email | cut -f 2 > AUTHORS
 
 dist: clean
-	python setup.py sdist
-	python setup.py bdist_wheel
+	python -m build
+	ls -l dist
 
 install: clean
 	python setup.py install
 
-bump:
-	bumpversion --tag-name "{new_version}" patch
+# build newsfragments into release notes and verify docs build correctly
+notes: check-bump validate-newsfragments
+	# Let UPCOMING_VERSION be the version that is used for the current bump
+	$(eval UPCOMING_VERSION=$(shell bump-my-version bump --dry-run $(bump) -v | awk -F"'" '/New version will be / {print $$2}'))
+	# Now generate the release notes to have them included in the release commit
+	towncrier build --yes --version $(UPCOMING_VERSION)
+	# Before we bump the version, make sure that the towncrier-generated docs will build
+	make docs
+	git commit -m "Compile release notes for v$(UPCOMING_VERSION)"
 
-deploy-prep: clean authors readme.html docs dist
+deploy-prep: clean authors docs dist
 	@echo "Did you remember to bump the version?"
 	@echo "If not, run 'bumpversion {patch, minor, major}' and run this target again"
 	@echo "Don't forget to update HISTORY.rst"
+
+# helpers
+
+# verify that newsfragments are valid and towncrier can build them
+validate-newsfragments:
+	python ./newsfragments/validate_files.py
+	towncrier build --draft --version preview
+
+# verify that a bump argument is set to be passed to bump-my-version
+check-bump:
+ifndef bump
+	$(error bump must be set, typically: major, minor, patch, or devnum)
+endif

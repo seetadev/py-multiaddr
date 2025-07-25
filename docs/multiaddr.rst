@@ -1,46 +1,62 @@
 multiaddr package
 =================
 
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   multiaddr.codecs
+   multiaddr.resolvers
+
 Submodules
 ----------
 
-multiaddr.codec module
-----------------------
+multiaddr.exceptions module
+---------------------------
 
-.. automodule:: multiaddr.codec
-    :members:
-    :undoc-members:
-    :show-inheritance:
+.. automodule:: multiaddr.exceptions
+   :members:
+   :show-inheritance:
+   :undoc-members:
 
 multiaddr.multiaddr module
 --------------------------
 
 .. automodule:: multiaddr.multiaddr
-    :members:
-    :undoc-members:
-    :show-inheritance:
+   :members:
+   :show-inheritance:
+   :undoc-members:
 
 multiaddr.protocols module
 --------------------------
 
 .. automodule:: multiaddr.protocols
-    :members:
-    :undoc-members:
-    :show-inheritance:
+   :members:
+   :show-inheritance:
+   :undoc-members:
 
-multiaddr.util module
----------------------
+multiaddr.transforms module
+---------------------------
 
-.. automodule:: multiaddr.util
-    :members:
-    :undoc-members:
-    :show-inheritance:
+.. automodule:: multiaddr.transforms
+   :members:
+   :show-inheritance:
+   :undoc-members:
 
+multiaddr.utils module
+----------------------
+
+.. automodule:: multiaddr.utils
+   :members:
+   :show-inheritance:
+   :undoc-members:
 
 Module contents
 ---------------
 
 .. automodule:: multiaddr
-    :members:
-    :undoc-members:
-    :show-inheritance:
+   :members:
+   :show-inheritance:
+   :undoc-members:

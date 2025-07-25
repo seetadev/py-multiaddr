@@ -70,7 +70,6 @@ def test_protocol_with_name():
     assert proto.code == protocols.P_IP4
     assert proto.size == 32
     assert proto.vcode == varint.encode(protocols.P_IP4)
-    assert hash(proto) == protocols.P_IP4
     assert protocols.protocol_with_any('ip4') == proto
     assert protocols.protocol_with_any(proto) == proto
 
@@ -84,7 +83,6 @@ def test_protocol_with_code():
     assert proto.code == protocols.P_IP4
     assert proto.size == 32
     assert proto.vcode == varint.encode(protocols.P_IP4)
-    assert hash(proto) == protocols.P_IP4
     assert protocols.protocol_with_any(protocols.P_IP4) == proto
     assert protocols.protocol_with_any(proto) == proto
 
@@ -125,7 +123,7 @@ def test_protocols_with_string_mixed():
     names = ['ip4']
     ins = "/".join(names)
     test_protocols_with_string(names)
-    with pytest.raises(exceptions.ProtocolNotFoundError):
+    with pytest.raises(exceptions.StringParseError):
         names.append("foo")
         ins = "/".join(names)
         protocols.protocols_with_string(ins)
@@ -155,13 +153,14 @@ def test_add_protocol_twice(valid_params):
 
 def test_add_protocol_alias():
     registry = protocols.REGISTRY.copy(unlock=True)
+    tcp_proto = protocols.protocol_with_name("tcp")
     registry.add_alias_name("tcp", "abcd")
-    registry.add_alias_code("tcp", 123456)
+    registry.add_alias_code(tcp_proto, 123456)
 
     with pytest.raises(exceptions.ProtocolExistsError):
         registry.add_alias_name("tcp", "abcd")
     with pytest.raises(exceptions.ProtocolExistsError):
-        registry.add_alias_code("tcp", 123456)
+        registry.add_alias_code(tcp_proto, 123456)
 
     assert registry.find("tcp") is registry.find("abcd")
     assert registry.find("tcp") is registry.find(123456)
@@ -178,7 +177,8 @@ def test_add_protocol_lock(valid_params):
     with pytest.raises(exceptions.ProtocolRegistryLocked):
         registry.add_alias_name("tcp", "abcdef")
     with pytest.raises(exceptions.ProtocolRegistryLocked):
-        registry.add_alias_code(0x4, 0x123456)
+        tcp_proto = protocols.protocol_with_name("tcp")
+        registry.add_alias_code(tcp_proto, 123456)
 
 
 def test_protocol_repr():

@@ -38,7 +38,8 @@ Simple
     m1 = Multiaddr("/ip4/127.0.0.1/udp/1234")
 
     # construct from bytes
-    m2 = Multiaddr(bytes_addr=m1.to_bytes())
+    #m2 = Multiaddr(bytes_addr=m1.to_bytes()) # deprecated
+    m2 = Multiaddr(m1.to_bytes())
 
     assert str(m1) == "/ip4/127.0.0.1/udp/1234"
     assert str(m1) == str(m2)
@@ -76,6 +77,16 @@ En/decapsulate
     m1.decapsulate(Multiaddr("/udp"))
     # <Multiaddr /ip4/127.0.0.1>
 
+    # Decapsulate by protocol code
+    m2 = Multiaddr("/ip4/192.168.1.1/tcp/8080/udp/1234")
+    m2.decapsulate_code(6)  # TCP protocol code
+    # <Multiaddr /ip4/192.168.1.1>
+
+    # Decapsulate multiple layers
+    m3 = Multiaddr("/ip4/10.0.0.1/tcp/443/tls/p2p/QmPeer")
+    m3.decapsulate_code(6)  # Remove TCP and everything after
+    # <Multiaddr /ip4/10.0.0.1>
+
 
 Tunneling
 ---------
@@ -94,6 +105,117 @@ Multiaddr allows expressing tunnels very nicely.
     proxyAgain = printerOverProxy.decapsulate(printer)
     print(proxyAgain)
     # /ip4/10.20.30.40/tcp/443
+
+DNS Resolution
+--------------
+
+Multiaddr supports DNS-based address resolution using the DNSADDR protocol. This is particularly useful for resolving bootstrap node addresses and maintaining peer IDs during resolution.
+
+
+.. code-block:: python
+
+    from multiaddr import Multiaddr
+    import trio
+
+    # Basic DNS resolution
+    ma = Multiaddr("/dns/example.com")
+    resolved = await ma.resolve()
+    print(resolved)
+    # [Multiaddr("/ip4/93.184.216.34"), Multiaddr("/ip6/2606:2800:220:1:248:1893:25c8:1946")]
+
+    # DNSADDR with peer ID (bootstrap node style)
+    ma_with_peer = Multiaddr("/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN")
+    resolved_with_peer = await ma_with_peer.resolve()
+    print(resolved_with_peer)
+    # [Multiaddr("/ip4/147.75.83.83/tcp/4001/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN")]
+
+    # DNS4 and DNS6 resolution (IPv4/IPv6 specific)
+    ma_dns4 = Multiaddr("/dns4/example.com/tcp/443")
+    resolved_dns4 = await ma_dns4.resolve()
+    print(resolved_dns4)
+    # [Multiaddr("/ip4/93.184.216.34/tcp/443")]
+
+    ma_dns6 = Multiaddr("/dns6/example.com/tcp/443")
+    resolved_dns6 = await ma_dns6.resolve()
+    print(resolved_dns6)
+    # [Multiaddr("/ip6/2606:2800:220:1:248:1893:25c8:1946/tcp/443")]
+
+    # Using the DNS resolver directly
+    from multiaddr.resolvers import DNSResolver
+    resolver = DNSResolver()
+    resolved = await resolver.resolve(ma)
+    print(resolved)
+    # [Multiaddr("/ip4/93.184.216.34"), Multiaddr("/ip6/2606:2800:220:1:248:1893:25c8:1946")]
+
+    # Peer ID preservation test
+    original_peer_id = ma_with_peer.get_peer_id()
+    print(f"Original peer ID: {original_peer_id}")
+    # Original peer ID: QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN
+
+    for resolved_addr in resolved_with_peer:
+        preserved_peer_id = resolved_addr.get_peer_id()
+        print(f"Resolved peer ID: {preserved_peer_id}")
+        # Resolved peer ID: QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN
+
+For comprehensive examples including bootstrap node resolution, protocol comparison, and py-libp2p integration, see the `DNS examples <https://github.com/multiformats/py-multiaddr/tree/master/examples/dns>`_ in the examples directory.
+
+Thin Waist Address Validation
+-----------------------------
+
+Multiaddr provides thin waist address validation functionality to process multiaddrs and expand wildcard addresses to all available network interfaces. This is particularly useful for server configuration, network discovery, and dynamic port management.
+
+
+.. code-block:: python
+
+    from multiaddr import Multiaddr
+    from multiaddr.utils import get_thin_waist_addresses, get_network_addrs
+
+    # Network interface discovery
+    ipv4_addrs = get_network_addrs(4)
+    print(f"Available IPv4 addresses: {ipv4_addrs}")
+    # Available IPv4 addresses: ['192.168.1.12', '10.152.168.99']
+
+    # Specific address (no expansion)
+    addr = Multiaddr("/ip4/192.168.1.100/tcp/8080")
+    result = get_thin_waist_addresses(addr)
+    print(result)
+    # [<Multiaddr /ip4/192.168.1.100/tcp/8080>]
+
+    # IPv4 wildcard expansion
+    addr = Multiaddr("/ip4/0.0.0.0/tcp/8080")
+    result = get_thin_waist_addresses(addr)
+    print(result)
+    # [<Multiaddr /ip4/192.168.1.12/tcp/8080>, <Multiaddr /ip4/10.152.168.99/tcp/8080>]
+
+    # IPv6 wildcard expansion
+    addr = Multiaddr("/ip6/::/tcp/8080")
+    result = get_thin_waist_addresses(addr)
+    print(result)
+    # [<Multiaddr /ip6/::1/tcp/8080>, <Multiaddr /ip6/fd9b:9eba:8224:1:41a1:8939:231a:b414/tcp/8080>]
+
+    # Port override
+    addr = Multiaddr("/ip4/0.0.0.0/tcp/8080")
+    result = get_thin_waist_addresses(addr, port=9000)
+    print(result)
+    # [<Multiaddr /ip4/192.168.1.12/tcp/9000>, <Multiaddr /ip4/10.152.168.99/tcp/9000>]
+
+    # UDP transport support
+    addr = Multiaddr("/ip4/0.0.0.0/udp/1234")
+    result = get_thin_waist_addresses(addr)
+    print(result)
+    # [<Multiaddr /ip4/192.168.1.12/udp/1234>, <Multiaddr /ip4/10.152.168.99/udp/1234>]
+
+    # Server binding scenario
+    wildcard = Multiaddr("/ip4/0.0.0.0/tcp/8080")
+    interfaces = get_thin_waist_addresses(wildcard)
+    print("Available interfaces for server binding:")
+    for i, interface in enumerate(interfaces, 1):
+        print(f"  {i}. {interface}")
+    # Available interfaces for server binding:
+    #   1. /ip4/192.168.1.12/tcp/8080
+    #   2. /ip4/10.152.168.99/tcp/8080
+
+For comprehensive examples including error handling, practical usage scenarios, and detailed network interface information, see the `thin waist examples <https://github.com/multiformats/py-multiaddr/tree/master/examples/thin_waist>`_ in the examples directory.
 
 Maintainers
 ===========
